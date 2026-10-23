@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Clock,
   Coins,
-  Lock
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { BLACK_MARKET_ITEMS } from './BlackMarket';
 import {
@@ -33,6 +34,7 @@ export const DegenShop = ({
   inventory = {},
   activeEffects = {},
   onBuyBlackMarketItem,
+  onOpenRewardedAd,
   t = {},
   language = 'id',
   formatMoney,
@@ -158,6 +160,34 @@ export const DegenShop = ({
 
       {/* Main Tab Content */}
       <div className="p-4 flex-1 overflow-y-auto max-h-[620px] space-y-3">
+        {/* Rewarded Ad Free Whale Token Banner */}
+        {onOpenRewardedAd && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-sky-500/10 to-emerald-500/10 border border-purple-500/30">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Klaim Whale Token Gratis</span>
+                  <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-mono font-bold">SPONSOR</span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Tonton sponsor resmi untuk mendapatkan <strong>+5 Whale Token</strong> instan tanpa deposit.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenRewardedAd}
+              className="w-full sm:w-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Tonton Iklan (+5 Token)</span>
+            </button>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* SUBTAB 1: INFRASTRUKTUR */}
         {/* ========================================================================= */}

@@ -1221,6 +1221,7 @@ function TradingGame() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showWorkstationGallery, setShowWorkstationGallery] = useState(false);
   const [showRewardedAdModal, setShowRewardedAdModal] = useState(false);
+  const [adRewardType, setAdRewardType] = useState('liquidation_bailout'); // 'liquidation_bailout' | 'whale_token'
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeTab, setActiveTab] = useState('quests');
@@ -4410,6 +4411,7 @@ function TradingGame() {
       setLiquidationAlert(null);
       triggerToast(`Dana Talangan Cair 20%! +${formatMoney(recovery)} masuk ke kas.`, 'success');
     } else {
+      setAdRewardType('liquidation_bailout');
       setShowRewardedAdModal(true);
     }
   };
@@ -4576,6 +4578,20 @@ function TradingGame() {
                   +{claimableWhaleTokens}
                 </span>
               )}
+            </button>
+
+            {/* Free Whale Token Rewarded Ad Button */}
+            <button
+              onClick={() => {
+                setAdRewardType('whale_token');
+                setShowRewardedAdModal(true);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500/20 to-sky-500/20 hover:from-purple-500/30 hover:to-sky-500/30 text-purple-300 border border-purple-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Tonton Iklan (+5 Whale Token Gratis)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+              <span className="hidden sm:inline">Gratis:</span>
+              <span className="font-mono text-purple-200">+5 Token</span>
             </button>
 
             <button
@@ -6654,6 +6670,10 @@ function TradingGame() {
             inventory={inventory}
             activeEffects={activeEffects}
             onBuyBlackMarketItem={handleBuyBlackMarketItem}
+            onOpenRewardedAd={() => {
+              setAdRewardType('whale_token');
+              setShowRewardedAdModal(true);
+            }}
             t={t}
             language={language}
             formatMoney={formatMoney}
@@ -7381,9 +7401,15 @@ function TradingGame() {
       <RewardedAdModal
         isOpen={showRewardedAdModal}
         onClose={() => setShowRewardedAdModal(false)}
-        rewardTitle="Dana Talangan 20%"
-        rewardAmountFormatted={formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))}
+        rewardTitle={adRewardType === 'whale_token' ? '5 Whale Token Gratis' : 'Dana Talangan 20%'}
+        rewardAmountFormatted={adRewardType === 'whale_token' ? '5 Whale Tokens' : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))}
         onRewardComplete={() => {
+          if (adRewardType === 'whale_token') {
+            setWhaleTokens((prev) => prev + 5);
+            playProfitSound();
+            triggerToast('🎉 +5 Whale Token berhasil ditambahkan ke dompet Anda!', 'success');
+            return;
+          }
           if (!liquidationAlert) return;
           const recovery = Math.max(5, liquidationAlert.lostAmount * 0.2);
           setCash((c) => c + recovery);
