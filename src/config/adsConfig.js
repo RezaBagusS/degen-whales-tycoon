@@ -28,11 +28,12 @@ export const ADS_CONFIG = {
     sponsorTagline: 'Desentralisasi Likuiditas Degen Terbesar di Solana'
   },
 
-  // Konfigurasi Monetag (resmi terhubung dengan direct link publisher)
+  // Konfigurasi Monetag (resmi terhubung dengan direct link & vignette publisher)
   monetag: {
     directLinkUrl: 'https://uplcm.com/4/12106307',
-    zoneId: '12106307',
-    scriptUrl: ''
+    directLinkZoneId: '12106307',
+    vignetteZoneId: '12106783',
+    scriptUrl: 'https://n6wxm.com/vignette.min.js'
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)

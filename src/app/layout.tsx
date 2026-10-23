@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -20,6 +21,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="id">
       <head>
         <meta name="monetag" content="99242c795ef560bb1f8a03bb35800ae8" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(s){s.dataset.zone='12106783',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`
+          }}
+        />
       </head>
       <body>
         {children}
