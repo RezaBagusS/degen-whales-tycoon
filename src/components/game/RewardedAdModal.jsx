@@ -82,10 +82,14 @@ export default function RewardedAdModal({
           </div>
 
           <h3 className="text-lg sm:text-xl font-black text-white tracking-wide uppercase">
-            {ADS_CONFIG.simulator.sponsorName}
+            {ADS_CONFIG.mode === 'monetag'
+              ? 'Monetag Ad Network'
+              : ADS_CONFIG.simulator.sponsorName}
           </h3>
           <p className="text-xs text-slate-300 max-w-sm mt-1.5 leading-relaxed">
-            {ADS_CONFIG.simulator.sponsorTagline}
+            {ADS_CONFIG.mode === 'monetag'
+              ? 'Tonton sponsor resmi untuk mencairkan hadiah talangan darurat Anda.'
+              : ADS_CONFIG.simulator.sponsorTagline}
           </p>
 
           <div className="mt-4 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-xs font-mono text-emerald-400 flex items-center gap-2">
@@ -113,6 +117,13 @@ export default function RewardedAdModal({
           {isFinished ? (
             <button
               onClick={() => {
+                if (ADS_CONFIG.mode === 'monetag' && ADS_CONFIG.monetag.directLinkUrl) {
+                  try {
+                    window.open(ADS_CONFIG.monetag.directLinkUrl, '_blank', 'noopener,noreferrer');
+                  } catch {
+                    // Fallback if popup blocked
+                  }
+                }
                 onRewardComplete();
                 onClose();
               }}

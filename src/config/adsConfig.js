@@ -12,7 +12,7 @@
 
 export const ADS_CONFIG = {
   // Mode aktif: 'simulator' | 'monetag' | 'adsense' | 'custom'
-  mode: 'simulator',
+  mode: 'monetag',
 
   // Link Saweria resmi developer
   donation: {
@@ -28,9 +28,10 @@ export const ADS_CONFIG = {
     sponsorTagline: 'Desentralisasi Likuiditas Degen Terbesar di Solana'
   },
 
-  // Konfigurasi Monetag (isi jika sudah daftar di monetag.com)
+  // Konfigurasi Monetag (resmi terhubung dengan direct link publisher)
   monetag: {
-    zoneId: '',
+    directLinkUrl: 'https://uplcm.com/4/12106307',
+    zoneId: '12106307',
     scriptUrl: ''
   },
 
