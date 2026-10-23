@@ -1,0 +1,10 @@
+{
+  "syntaxFilesPassed": 16,
+  "localImportsPassed": 6,
+  "tailwindCssBytes": 44396,
+  "routeBundleSyntaxBytes": 105070,
+  "engineMatchesArtifactV2": true,
+  "testsIncluded": 21,
+  "nextBuild": "NOT RUN: Next.js/npm unavailable and no internet access",
+  "nextBrowserTests": "NOT RUN"
+}

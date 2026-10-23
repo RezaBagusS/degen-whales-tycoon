@@ -1,0 +1,55 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String       @id @default(uuid())
+  username      String       @unique
+  walletAddress String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  save          GameSave?
+  syndicateId   String?
+  syndicate     Syndicate?   @relation(fields: [syndicateId], references: [id])
+
+  @@index([username])
+}
+
+model GameSave {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cash                 Float    @default(100.0)
+  peakNetWorth         Float    @default(100.0)
+  whaleTokens          Int      @default(0)
+  currentLocationLevel Int      @default(1)
+  
+  // JSON payload stores upgrades, inventory, activeEffects, trade history
+  upgrades             Json     @default("{}")
+  inventory            Json     @default("{\"pump_whistle\":0,\"dump_horn\":0,\"liq_shield\":0,\"leverage_250x\":0,\"zero_fee\":0,\"insider_radar\":0}")
+  activeEffects        Json     @default("{\"zeroFeeUntil\":0,\"has250xTicket\":false,\"radarUntil\":0}")
+  activePosition       Json?
+  tradeHistory         Json     @default("[]")
+
+  lastSavedAt          DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Syndicate {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  tag              String   @unique
+  description      String?
+  treasury         Float    @default(0.0)
+  totalWhaleTokens Int      @default(0)
+  
+  members          User[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

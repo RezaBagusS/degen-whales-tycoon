@@ -1,0 +1,42 @@
+services:
+  # PostgreSQL Database Container
+  postgres:
+    image: postgres:16-alpine
+    container_name: degenwhale-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: degen
+      POSTGRES_PASSWORD: degenwhale123
+      POSTGRES_DB: degenwhale_db
+    ports:
+      # Port 5433 di host agar tidak bertabrakan dengan PostgreSQL lain di port 5432
+      - "5433:5432"
+    volumes:
+      - degenwhale_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U degen -d degenwhale_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Web Application Container
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: degenwhale-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://degen:degenwhale123@postgres:5432/degenwhale_db
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      # Port 3001 di host agar tidak bentrok dengan dev server / project lain di port 3000
+      - "3001:3000"
+
+volumes:
+  degenwhale_pgdata:
+    driver: local

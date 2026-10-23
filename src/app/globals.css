@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #07090e;
+  color: #f1f5f9;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid #00ff88;
+  outline-offset: 3px;
+}
+
+/* Custom terminal scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(11, 14, 20, 0.5);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 136, 0.6);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) rgba(11, 14, 20, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes turntableOscillate {
+  0% {
+    transform: perspective(1100px) rotateX(11deg) rotateY(-22deg) scale(0.97);
+  }
+  50% {
+    transform: perspective(1100px) rotateX(16deg) rotateY(22deg) scale(1.03);
+  }
+  100% {
+    transform: perspective(1100px) rotateX(11deg) rotateY(-22deg) scale(0.97);
+  }
+}
+
+@keyframes turntablePedestalSpin {
+  0% {
+    transform: rotateX(72deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(72deg) rotateZ(360deg);
+  }
+}
+
+@keyframes holographicScan {
+  0% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+}
+
+.animate-diorama-turntable {
+  animation: turntableOscillate 10s ease-in-out infinite;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.animate-pedestal-spin {
+  animation: turntablePedestalSpin 16s linear infinite;
+  will-change: transform;
+}
+
+.animate-hologram-scan {
+  animation: holographicScan 4s ease-in-out infinite;
+}
+
