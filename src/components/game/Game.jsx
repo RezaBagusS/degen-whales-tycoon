@@ -873,6 +873,8 @@ function loadGame() {
     activeEffects: { zeroFeeUntil: 0, has250xTicket: false, radarUntil: 0 },
     dailyWhaleUsage: { lastWhistleDate: null, lastDumpDate: null }
   };
+  const initialAnchor = fresh.marketPrices[0] || MARKET_PAIRS[0].basePrice;
+  fresh.candlesticksByTf = generateSynchronousCandlesForPair(0, initialAnchor);
   try {
     const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY);
     if (!raw) return fresh;
@@ -924,7 +926,15 @@ function loadGame() {
       }
       return result;
     };
-    const savedCandles = (saved.syncVersion >= 2) ? parseCandlesticks(saved.candlesticksByTf) : {};
+    let savedCandles = (saved.syncVersion >= 2) ? parseCandlesticks(saved.candlesticksByTf) : {};
+    const selectedTf = Number.isInteger(saved.selectedTfIdx) && TIMEFRAMES[saved.selectedTfIdx]
+      ? saved.selectedTfIdx : 0;
+    const activePairKey = `${pairIdx}-${selectedTf}`;
+    if (!savedCandles[activePairKey] || savedCandles[activePairKey].length === 0) {
+      const anchorP = prices[pairIdx] || MARKET_PAIRS[pairIdx].basePrice;
+      const generated = generateSynchronousCandlesForPair(pairIdx, anchorP);
+      savedCandles = { ...savedCandles, ...generated };
+    }
     const todayStr = getTodayDateStr();
     const savedDaily = saved.dailyQuestState;
     const validDaily = savedDaily && savedDaily.date === todayStr ? {
@@ -2616,12 +2626,14 @@ function TradingGame() {
       : marketPricesRef.current[pairIdx];
     const anchorPrice = livePrice || pair?.basePrice || 100;
     const syncMap = generateSynchronousCandlesForPair(pairIdx, anchorPrice);
-    const updated = {
+    candlesticksByTfRef.current = {
       ...candlesticksByTfRef.current,
       ...syncMap
     };
-    candlesticksByTfRef.current = updated;
-    setCandlesticksByTf(updated);
+    setCandlesticksByTf(prev => ({
+      ...prev,
+      ...syncMap
+    }));
 
     if (pair && pair.marketType === 'crypto_real') {
       fetchLiveKlinesForPair(pairIdx, tfIdx);
@@ -2632,7 +2644,7 @@ function TradingGame() {
   // is instantaneous, 100% synchronous, and shares the exact same tick stream without changing prices or PnL.
   useEffect(() => {
     const key = `${selectedPairIdx}-${selectedTfIdx}`;
-    if (!candlesticksByTf[key]) {
+    if (!candlesticksByTf[key] || candlesticksByTf[key].length === 0) {
       initCandlesForPairAndTf(selectedPairIdx, selectedTfIdx);
     }
     const pair = MARKET_PAIRS[selectedPairIdx];
@@ -2786,7 +2798,19 @@ function TradingGame() {
 
   const activeCandles = useMemo(() => {
     const key = `${selectedPairIdx}-${selectedTfIdx}`;
-    return candlesticksByTf[key] || [];
+    const fromState = candlesticksByTf[key];
+    if (fromState && fromState.length > 0) return fromState;
+    const fromRef = candlesticksByTfRef.current[key];
+    if (fromRef && fromRef.length > 0) return fromRef;
+
+    // Safety net: Always immediately guarantee a populated candle stream
+    const pair = MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0];
+    const livePrice = (pair?.marketType === 'crypto_real' && liveCryptoStatsRef.current?.[pair.symbol]?.price)
+      ? liveCryptoStatsRef.current[pair.symbol].price
+      : marketPricesRef.current[selectedPairIdx] || pair.basePrice;
+    const syncMap = generateSynchronousCandlesForPair(selectedPairIdx, livePrice);
+    candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+    return syncMap[key] || [];
   }, [candlesticksByTf, selectedPairIdx, selectedTfIdx]);
 
   const displayCandle = useMemo(() => {
@@ -3726,8 +3750,12 @@ function TradingGame() {
             const pPrice = marketPricesRef.current[pIdx];
             TIMEFRAMES.forEach((tf, tfIdx) => {
               const key = `${pIdx}-${tfIdx}`;
-              const list = prevMap[key];
-              if (!list?.length) return;
+              let list = prevMap[key] || candlesticksByTfRef.current[key];
+              if (!list?.length) {
+                const syncMap = generateSynchronousCandlesForPair(pIdx, pPrice);
+                next[key] = syncMap[key] || [];
+                return;
+              }
               const last = list[list.length - 1];
               const time = Math.floor(nowMs / (tf.seconds * 1000)) * tf.seconds * 1000;
               next[key] = last.time === time ? [
@@ -5261,7 +5289,14 @@ function TradingGame() {
                                 type="button"
                                 onClick={() => {
                                   setSelectedPairIdx(originalIdx);
-                                  setCurrentPrice(marketPricesRef.current[originalIdx]);
+                                  const liveP = marketPricesRef.current[originalIdx] ?? pair.basePrice;
+                                  setCurrentPrice(liveP);
+                                  const tfKey = `${originalIdx}-${selectedTfIdx}`;
+                                  if (!candlesticksByTfRef.current[tfKey]?.length) {
+                                    const syncMap = generateSynchronousCandlesForPair(originalIdx, liveP);
+                                    candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+                                    setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
+                                  }
                                   setQuestStats((prev) => ({ ...prev, switchedPairOrTf: true }));
                                   setIsPairDropdownOpen(false);
                                   setPairSearchQuery('');
@@ -5396,6 +5431,14 @@ function TradingGame() {
                       key={tf.label}
                       onClick={() => {
                         setSelectedTfIdx(idx);
+                        const tfKey = `${selectedPairIdx}-${idx}`;
+                        if (!candlesticksByTfRef.current[tfKey]?.length) {
+                          const pair = MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0];
+                          const liveP = marketPricesRef.current[selectedPairIdx] ?? pair.basePrice;
+                          const syncMap = generateSynchronousCandlesForPair(selectedPairIdx, liveP);
+                          candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+                          setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
+                        }
                         setQuestStats((prev) => ({ ...prev, switchedPairOrTf: true }));
                       }}
                       className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-bold transition-all cursor-pointer shrink-0 ${
@@ -6011,7 +6054,14 @@ function TradingGame() {
                               const pIdx = MARKET_PAIRS.findIndex(p => p.symbol === activePosition.pairSymbol);
                               if (pIdx >= 0) {
                                 setSelectedPairIdx(pIdx);
-                                setCurrentPrice(marketPricesRef.current[pIdx]);
+                                const liveP = marketPricesRef.current[pIdx] ?? MARKET_PAIRS[pIdx].basePrice;
+                                setCurrentPrice(liveP);
+                                const tfKey = `${pIdx}-${selectedTfIdx}`;
+                                if (!candlesticksByTfRef.current[tfKey]?.length) {
+                                  const syncMap = generateSynchronousCandlesForPair(pIdx, liveP);
+                                  candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+                                  setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
+                                }
                               }
                             }}
                             className="px-1.5 py-0.5 rounded text-[10px] font-mono text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 cursor-pointer"
