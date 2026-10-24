@@ -2,9 +2,9 @@
 
 Dokumentasi game dan proyek Next.js
 
-- Versi game: **1.4.0**
+- Versi game: **1.4.1**
 - Basis kode: **Degen & Whale Cloud Sync Edition**
-- Tanggal dokumentasi: **24 Oktober 2026**
+- Tanggal dokumentasi: **25 Oktober 2026**
 - Bahasa antarmuka: Indonesia & English
 - Genre: idle tycoon dan simulasi trading fiktif
 
@@ -171,22 +171,24 @@ margin posisi adalah nilai setelah biaya pembukaan.
 
 TP/SL harus berupa angka positif jika diisi:
 
-- LONG: TP lebih tinggi dari entry, SL lebih rendah dari entry.
-- SHORT: TP lebih rendah dari entry, SL lebih tinggi dari entry.
+- LONG: TP lebih tinggi dari entry. SL dapat dipasang di bawah entry (Stop Loss standar), setara entry (Break-Even Point / BEP), atau di atas entry (SL+ / Kunci Cuan) asalkan tidak melewati harga likuidasi dan tidak melampaui harga pasar saat ini.
+- SHORT: TP lebih rendah dari entry. SL dapat dipasang di atas entry (Stop Loss standar), setara entry (Break-Even Point / BEP), atau di bawah entry (SL+ / Kunci Cuan) asalkan tidak melewati harga likuidasi dan tidak melampaui harga pasar saat ini.
 
 Validasi dilakukan sebelum cash dipotong. Target tidak valid membatalkan pembukaan.
 
-### Estimasi PnL ($) dan Penyesuaian TP/SL pada Posisi Terbuka
+### Estimasi PnL ($) dan Penyesuaian TP/SL pada Posisi Terbuka (Termasuk BEP & SL+)
 
 1. **Proyeksi Dolar Real-Time pada Form Order**:
    - Saat memasukkan nilai Take Profit (TP), sistem secara otomatis menghitung dan menampilkan estimasi keuntungan dalam nominal dolar dan persentase ROI (misal: `Est. Cuan (LONG): +$17.16 (+69.7%)`).
-   - Saat memasukkan nilai Stop Loss (SL), sistem menampilkan estimasi risiko kerugian dalam nominal dolar dan persentase ROI (misal: `Est. Rugi (LONG): -$17.96 (-72.9%)`).
+   - Saat memasukkan nilai Stop Loss (SL), sistem menampilkan estimasi risiko atau profit terproteksi dalam nominal dolar dan persentase ROI (misal: `Est. Rugi (LONG): -$17.96 (-72.9%)` atau saat SL+: `Est. Cuan Terkunci: +$12.50 (+50.0%)`).
 
-2. **Penyesuaian (Adjust) TP & SL Saat Posisi Sudah Terbuka**:
+2. **Penyesuaian (Adjust) & Drag-and-Drop TP/SL (BEP & SL+)**:
    - Kartu posisi aktif menampilkan nominal target TP dan SL lengkap dengan proyeksi keuntungan/kerugian dolar yang akan diterima jika target tersentuh (contoh: `TP: $450.00 (+$17.16)` dan `SL: $400.00 (-$12.08)`).
-   - Pemain dapat mengeklik tombol/badge TP atau SL pada kartu posisi kapan saja untuk membuka modal penyesuaian:
-     - Dilengkapi tombol preset ROI cepat (`+25%`, `+50%`, `+100%`, `+200%` untuk Take Profit dan `-10%`, `-25%`, `-50%`, `-75%` untuk Stop Loss).
-     - Menghitung live estimasi keuntungan/kerugian dolar serta total saldo kas yang akan masuk atau tersisa.
+   - Pemain dapat menggeser garis SL langsung pada canvas atau mengeklik tombol/badge TP/SL untuk membuka modal penyesuaian:
+     - **Break-Even Point (BEP)**: Pemain dapat menempatkan SL tepat di harga entry, menjaga modal terproteksi 100% tanpa risiko kerugian. Garis dan pill sumbu otomatis berubah menjadi **Biru Langit (Sky Blue)**.
+     - **SL+ (Kunci Profit / Trailing Lock)**: Pemain dapat menempatkan SL di atas entry untuk posisi LONG (atau di bawah entry untuk posisi SHORT) ketika posisi sudah dalam keadaan profit, sehingga jika pasar berbalik arah profit tetap terkunci aman. Garis dan pill sumbu otomatis berubah menjadi **Hijau Emerald**.
+     - **SL Standar**: Garis dan pill sumbu berwarna **Amber/Orange**.
+     - Notifikasi toast adaptif memberikan konfirmasi visual instan saat SL digeser ke status BEP atau SL+.
      - Memvalidasi batas harga likuidasi secara ketat sehingga SL tidak dapat dipasang melewati zona likuidasi.
      - Pilihan tombol **"Hapus TP"** dan **"Hapus SL"** jika pemain ingin membatalkan target otomatis.
      - Perubahan target langsung mengupdate garis chart secara instan dan tersimpan ke autosave `localStorage`.
@@ -197,11 +199,18 @@ Pada versi awal, harga likuidasi (`liqPrice`) yang jauh (misalnya jarak 10%–50
 
 Sistem chart telah disempurnakan dengan standar platform profesional:
 1. **Skala Y Berpusat pada Candlestick & Harga Aktif**: Skala grafik memprioritaskan rentang lilin aktif (`high`/`low`) dan `currentPrice`, dengan batas ketinggian visual minimum (minimal 0,8% dari harga aset) dan padding vertikal 16%. Candlestick tetap proporsional dan dinamis.
-2. **Ekspansi Skala Selektif**: Level posisi (`entryPrice`, TP, SL) hanya memperluas rentang sumbu Y jika berada dalam jangkauan dekat lilin aktif (maksimal ~1,8x span candle). Harga likuidasi hanya masuk ke layar ketika pergerakan pasar sudah mendekati zona kritis likuidasi.
-3. **Indikator Off-Screen Navigator**: Jika level likuidasi atau TP/SL berada di luar layar, sistem merender *pill navigator* elegan di sudut canvas (contoh: `▲ LIQ: $458.34 (+9.2%)` atau `▼ LIQ: $380.00 (-9.5%)`) lengkap dengan persentase jarak relatif terhadap harga aktif.
-4. **Garis Posisi Halus & Pill Sumbu Bersih**: Garis posisi digambar putus-putus halus (1,2px) dengan pill tag kecil di sisi kiri dan pill harga kontras tinggi di sumbu kanan, tanpa menutupi angka sumbu harga.
-5. **Status Header & Card Posisi Responsif**: Di bagian atas canvas terdapat badge ringkas status posisi aktif, serta card posisi bawah yang dilengkapi indikator jarak aman ke harga likuidasi (*safety distance*).
-6. **TradingView-Style Interactive X & Y Axis Drag-to-Zoom**: Pengguna dapat melakukan zoom in dan zoom out fleksibel seperti di TradingView dengan menggeser sumbu X (waktu/jam di bawah: drag kanan untuk zoom in memperlebar lilin, drag kiri untuk zoom out) dan sumbu Y (harga di kanan: drag atas untuk zoom in memperluas bentang harga, drag bawah untuk zoom out). Double-click pada sumbu atau klik tombol `AUTO` di pojok kanan bawah mereset zoom kembali ke auto-fit seketika.
+2. **TradingView-Style Right Margin (Breathing Room)**: Canvas menyediakan ruang bernapas 6 bar lilin di sisi kanan secara default, meniru konvensi TradingView agar candlestick harga aktif tidak menempel rapat di tepi sumbu dan memberikan ruang proyeksi pergerakan harga ke depan.
+3. **Minimum 400 Candlestick per Timeframe**: Mesin candlestick menjamin ketersediaan minimal 400 candle historis untuk setiap timeframe sejak awal sesi login. Hal ini memastikan indikator teknikal periode panjang (khususnya EMA 200, EMA 50, dan EMA 20) langsung terhitung dan muncul sempurna tanpa harus menunggu akumulasi 200 candle baru.
+4. **Presisi Harga Pasar & Anti-Overlap UI**:
+   - **Degen Perps** (`DEGEN/USDT`, `GORENG/IDR`, `WHALE/USD`): Terstandarisasi tepat 2 angka di belakang koma ($420.69, $1250.00, $69420.00).
+   - **Crypto Live**: Mengikuti presisi live bursa riil (DOGE/USDT memakai 4 desimal, koin lainnya 2 desimal).
+   - **Stabilisasi Metrik 24 Jam**: Menggunakan baseline harga referensi 24 jam stabil (`degen24hBaselineRef`), melenyapkan glitch lonjakan persentase liar.
+   - **Tata Letak Anti-Overlap**: Kolom harga dropdown, wrapper header, serta badge atas (TF, OHLC, Posisi) ditata responsif sehingga tidak bertabrakan atau menutupi sumbu kanan pada layar mobile maupun desktop.
+5. **Ekspansi Skala Selektif**: Level posisi (`entryPrice`, TP, SL) hanya memperluas rentang sumbu Y jika berada dalam jangkauan dekat lilin aktif (maksimal ~1,8x span candle). Harga likuidasi hanya masuk ke layar ketika pergerakan pasar sudah mendekati zona kritis likuidasi.
+6. **Indikator Off-Screen Navigator**: Jika level likuidasi atau TP/SL berada di luar layar, sistem merender *pill navigator* elegan di sudut canvas (contoh: `▲ LIQ: $458.34 (+9.2%)` atau `▼ LIQ: $380.00 (-9.5%)`) lengkap dengan persentase jarak relatif terhadap harga aktif.
+7. **Garis Posisi Halus & Pill Sumbu Bersih**: Garis posisi digambar putus-putus halus (1,2px) dengan pill tag kecil di sisi kiri dan pill harga kontras tinggi di sumbu kanan, tanpa menutupi angka sumbu harga.
+8. **Status Header & Card Posisi Responsif**: Di bagian atas canvas terdapat badge ringkas status posisi aktif, serta card posisi bawah yang dilengkapi indikator jarak aman ke harga likuidasi (*safety distance*).
+9. **TradingView-Style Interactive X & Y Axis Drag-to-Zoom**: Pengguna dapat melakukan zoom in dan zoom out fleksibel seperti di TradingView dengan menggeser sumbu X (waktu/jam di bawah: drag kanan untuk zoom in memperlebar lilin, drag kiri untuk zoom out) dan sumbu Y (harga di kanan: drag atas untuk zoom in memperluas bentang harga, drag bawah untuk zoom out). Double-click pada sumbu atau klik tombol `AUTO` di pojok kanan bawah mereset zoom kembali ke auto-fit seketika.
 
 ### Indikator Teknikal Interaktif pada Chart
 

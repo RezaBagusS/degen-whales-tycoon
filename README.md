@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/PLAY_NOW-degen--whales--tycoon.vercel.app-00FF88?style=for-the-badge&logo=vercel&logoColor=black)](https://degen-whales-tycoon.vercel.app)
-[![Version](https://img.shields.io/badge/version-1.4.0_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
+[![Version](https://img.shields.io/badge/version-1.4.1_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
 [![License](https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js_16-Turbopack-white?style=for-the-badge&logo=next.js&logoColor=black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React_19-Client_Engine-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -31,8 +31,11 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 
 ### 📈 1. Real-Time High-Octane Trading Terminal
 - **Living Candlestick Canvas Engine**: High-performance HTML5 2D canvas chart with smooth real-time price action and multi-timeframe aggregation (`5s`, `15s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`).
+- **TradingView-Style Margins & 400 Minimum Candles**: Right-side breathing room margin (6 offset bars) for forward price projection. Every timeframe maintains at least 400 historical candles from initial session load so long-term indicators (EMA 200, EMA 50, EMA 20) calculate and render immediately.
+- **Pro Risk Management & Advanced SL (BEP & SL+)**: Drag-and-drop Take-Profit (TP) and Stop-Loss (SL) lines directly on canvas. Supports setting SL at entry (Break-Even Point / BEP) or past entry (SL+ Lock Profit) with color-coded chart tags (Orange for standard SL, Sky Blue for BEP, Emerald Green for SL+).
+- **Exchange-Grade Precision**: Degen Perps (`DEGEN/USDT`, `GORENG/IDR`, `WHALE/USD`) strictly display 2 decimal places. Live Crypto follows real-market conventions (4 decimals for `DOGE/USDT`, 2 decimals for `BTC`, `ETH`, `SOL`, `BNB`, `AVAX`, `LINK`).
+- **Glitch-Free 24h Trend & Anti-Overlap UI**: Stabilized 24h change metrics across degen and live markets, paired with responsive anti-overlap dropdowns and badge containers.
 - **Flexible Leverage Spectrum**: Trade LONG or SHORT with `2x`, `10x`, `50x`, and `100x` leverage (up to `250x` with black market VIP passes).
-- **Pro Risk Management**: Set Take-Profit (TP) and Stop-Loss (SL) targets with visual drag-and-drop boundary lines directly on the chart.
 - **Realistic Slippage, Liquidation, & Volatility**: Simulated market orders, funding mechanics, closing taxes, and immediate liquidation alerts when margin falls below maintenance thresholds.
 - **Technical Analysis Suite**: Built-in EMA-20, EMA-50, EMA-200, Bollinger Bands, and interactive chart drawing tools (Trendlines, Horizontal Support/Resistance).
 
