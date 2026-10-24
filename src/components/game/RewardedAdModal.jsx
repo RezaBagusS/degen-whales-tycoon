@@ -48,7 +48,7 @@ export default function RewardedAdModal({
         <div className="px-4 py-3 bg-[#111622] border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold border border-amber-500/40 animate-pulse">
-              SPONSORED REWARDED AD
+              OFFICIAL PARTNER SPOTLIGHT
             </span>
             <span className="text-xs text-slate-400 font-mono hidden sm:inline">
               Mendanai {rewardTitle}
@@ -82,18 +82,14 @@ export default function RewardedAdModal({
           </div>
 
           <h3 className="text-lg sm:text-xl font-black text-white tracking-wide uppercase">
-            {ADS_CONFIG.mode === 'monetag'
-              ? 'Monetag Ad Network'
-              : ADS_CONFIG.simulator.sponsorName}
+            {ADS_CONFIG.simulator.sponsorName || 'Degen Institutional Partner'}
           </h3>
           <p className="text-xs text-slate-300 max-w-sm mt-1.5 leading-relaxed">
-            {ADS_CONFIG.mode === 'monetag'
-              ? 'Tonton sponsor resmi untuk mencairkan hadiah talangan darurat Anda.'
-              : ADS_CONFIG.simulator.sponsorTagline}
+            {ADS_CONFIG.simulator.sponsorTagline || 'Tayangan mitra resmi untuk mendukung ekosistem permainan & mencairkan reward Anda.'}
           </p>
 
           <div className="mt-4 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-xs font-mono text-emerald-400 flex items-center gap-2">
-            <span>🎁 Hadiah Ditonton:</span>
+            <span>🎁 Reward:</span>
             <strong>+{rewardAmountFormatted}</strong>
           </div>
         </div>
@@ -110,8 +106,8 @@ export default function RewardedAdModal({
         <div className="p-4 bg-[#111622] flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-[11px] text-slate-400">
             {isFinished
-              ? '✓ Iklan selesai! Saldo talangan siap dicairkan.'
-              : 'Tonton hingga akhir untuk mencairkan talangan.'}
+              ? '✓ Tayangan mitra selesai! Reward siap dicairkan.'
+              : 'Tonton hingga selesai untuk mengklaim reward.'}
           </div>
 
           {isFinished ? (

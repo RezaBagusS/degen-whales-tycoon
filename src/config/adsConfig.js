@@ -21,11 +21,11 @@ export const ADS_CONFIG = {
     username: 'rezabaguss'
   },
 
-  // Pengaturan Rewarded Ad Simulator
+  // Pengaturan Rewarded Ad Partner Display
   simulator: {
     durationSec: 5,
-    sponsorName: 'CyberPump Liquidity Protocol',
-    sponsorTagline: 'Desentralisasi Likuiditas Degen Terbesar di Solana'
+    sponsorName: 'Degen Capital Syndicate',
+    sponsorTagline: 'Mitra Likuiditas Global Mendanai Ekosistem Trading & Pertumbuhan Trader'
   },
 
   // Konfigurasi Monetag (resmi terhubung dengan direct link & vignette publisher)
