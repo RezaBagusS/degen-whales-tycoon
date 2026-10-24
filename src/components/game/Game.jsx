@@ -659,51 +659,31 @@ const NEWS_TICKER_ITEMS = [
 ];
 
 const MARKET_PAIRS = [
-  { symbol: 'DEGEN/USDT', name: 'Degen Whale Token', basePrice: 420.69, vol: 0.00035, category: 'degen', precision: 2, marketType: 'degen_perps' },
-  { symbol: 'GORENG/IDR', name: 'Gorengan Saham IDR', basePrice: 1250.0, vol: 0.00050, category: 'degen', precision: 2, marketType: 'degen_perps' },
-  { symbol: 'WHALE/USD', name: 'Whale Syndicate Index', basePrice: 69420.0, vol: 0.00012, category: 'top', precision: 2, marketType: 'degen_perps' },
-  { symbol: 'BTC/USDT', name: 'Bitcoin', basePrice: 67450.0, vol: 0.00015, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'BTCUSDT' },
-  { symbol: 'ETH/USDT', name: 'Ethereum', basePrice: 3480.0, vol: 0.00022, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'ETHUSDT' },
-  { symbol: 'SOL/USDT', name: 'Solana', basePrice: 106.50, vol: 0.00032, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'SOLUSDT' },
-  { symbol: 'BNB/USDT', name: 'Binance Coin', basePrice: 585.00, vol: 0.00020, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'BNBUSDT' },
+  { symbol: 'DEGEN/USDT', name: 'Degen Whale Token', basePrice: 420.69, vol: 0.00035, category: 'degen', precision: 4, marketType: 'degen_perps' },
+  { symbol: 'GORENG/IDR', name: 'Gorengan Saham IDR', basePrice: 1250.0, vol: 0.00050, category: 'degen', precision: 4, marketType: 'degen_perps' },
+  { symbol: 'WHALE/USD', name: 'Whale Syndicate Index', basePrice: 69420.0, vol: 0.00012, category: 'top', precision: 4, marketType: 'degen_perps' },
+  { symbol: 'BTC/USDT', name: 'Bitcoin', basePrice: 67450.0, vol: 0.00015, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'BTCUSDT' },
+  { symbol: 'ETH/USDT', name: 'Ethereum', basePrice: 3480.0, vol: 0.00022, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'ETHUSDT' },
+  { symbol: 'SOL/USDT', name: 'Solana', basePrice: 106.50, vol: 0.00032, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'SOLUSDT' },
+  { symbol: 'BNB/USDT', name: 'Binance Coin', basePrice: 585.00, vol: 0.00020, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'BNBUSDT' },
   { symbol: 'DOGE/USDT', name: 'Dogecoin', basePrice: 0.1521, vol: 0.00045, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'DOGEUSDT' },
-  { symbol: 'AVAX/USDT', name: 'Avalanche', basePrice: 28.50, vol: 0.00035, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'AVAXUSDT' },
-  { symbol: 'LINK/USDT', name: 'Chainlink', basePrice: 11.80, vol: 0.00030, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'LINKUSDT' }
+  { symbol: 'AVAX/USDT', name: 'Avalanche', basePrice: 28.50, vol: 0.00035, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'AVAXUSDT' },
+  { symbol: 'LINK/USDT', name: 'Chainlink', basePrice: 11.80, vol: 0.00030, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'LINKUSDT' }
 ];
 
-// Base precision for trading pairs according to real market standards (Binance / TradingView) - Max 4 decimals
+// Standard precision for all trading pairs - 4 decimals across all pairs matching DOGE/USDT
 export const getPairPrecision = (pairOrSymbol, price = null) => {
-  let pair = null;
-  if (typeof pairOrSymbol === 'string') {
-    pair = MARKET_PAIRS.find((p) => p.symbol === pairOrSymbol);
-  } else if (pairOrSymbol && typeof pairOrSymbol === 'object') {
-    pair = pairOrSymbol;
-  }
-  if (pair && typeof pair.precision === 'number') {
-    return Math.min(4, Math.max(2, pair.precision));
-  }
-  const checkPrice = price !== null && !isNaN(price) ? Math.abs(price) : (pair?.basePrice || 100);
-  if (checkPrice < 1) return 4;
-  if (checkPrice < 10) return 3;
-  return 2;
+  return 4;
 };
 
-// Dynamic chart price axis precision that adapts when zoomed in or when price steps are tight - Max 4 decimals
-export const getDynamicAxisPrecision = (priceRange, basePrecision = 2) => {
-  if (!priceRange || priceRange <= 0) return Math.min(4, Math.max(2, basePrecision));
-  const step = priceRange / 6;
-  let neededDecimals = 2;
-  if (step < 0.002) neededDecimals = 4;
-  else if (step < 0.02) neededDecimals = 3;
-  else neededDecimals = 2;
-
-  return Math.min(4, Math.max(basePrecision, neededDecimals));
+// Price axis precision - uniform 4 decimals across all pairs
+export const getDynamicAxisPrecision = (priceRange, basePrecision = 4) => {
+  return 4;
 };
 
-export const formatPairPrice = (price, decimals = 2) => {
-  if (price === null || price === undefined || isNaN(price)) return '$0.00';
-  const dec = Math.min(4, Math.max(2, decimals));
-  return `$${Number(price).toFixed(dec)}`;
+export const formatPairPrice = (price, decimals = 4) => {
+  if (price === null || price === undefined || isNaN(price)) return '$0.0000';
+  return `$${Number(price).toFixed(decimals)}`;
 };
 
 
@@ -986,7 +966,7 @@ function loadGame() {
             close: Math.max(0.01, c.close),
             time: Math.floor(c.time)
           }))
-          .slice(-300);
+          .slice(-500);
         if (validCandles.length > 0) {
           result[k] = validCandles;
         }
@@ -997,7 +977,7 @@ function loadGame() {
     const selectedTf = Number.isInteger(saved.selectedTfIdx) && TIMEFRAMES[saved.selectedTfIdx]
       ? saved.selectedTfIdx : 0;
     const activePairKey = `${pairIdx}-${selectedTf}`;
-    if (!savedCandles[activePairKey] || savedCandles[activePairKey].length === 0) {
+    if (!savedCandles[activePairKey] || savedCandles[activePairKey].length < 400) {
       const anchorP = prices[pairIdx] || MARKET_PAIRS[pairIdx].basePrice;
       const generated = generateSynchronousCandlesForPair(pairIdx, anchorP);
       savedCandles = { ...savedCandles, ...generated };
@@ -1157,7 +1137,7 @@ function generateSynchronousCandlesForPair(pairIdx, anchorPrice) {
   const current30mBucket = Math.floor(now / 1800000) * 1800000;
   const current5sBucket = Math.floor(now / 5000) * 5000;
   const elapsed5sSince30m = Math.floor((current5sBucket - current30mBucket) / 5000);
-  const num5sBars = 19000 + elapsed5sSince30m + 1;
+  const num5sBars = 36000 + elapsed5sSince30m + 1;
   const raw5s = [];
   let pClose = anchorPrice;
 
@@ -1193,8 +1173,8 @@ function generateSynchronousCandlesForPair(pairIdx, anchorPrice) {
   const recentBars15m = aggregate(bars5s, 900);
   const oldestRecent15m = recentBars15m[0];
 
-  // 3. Bangun bar 15m historis makro sebelum rentang recent hingga 52 hari ke belakang
-  const numMacro15m = 5000;
+  // 3. Bangun bar 15m historis makro sebelum rentang recent hingga 500 hari ke belakang (48,000 bars)
+  const numMacro15m = 48000;
   const rawMacro15m = [];
   let macroClose = oldestRecent15m.open;
   const oldestTime = oldestRecent15m.time;
@@ -1240,16 +1220,16 @@ function generateSynchronousCandlesForPair(pairIdx, anchorPrice) {
   const fullBars15s = aggregate(bars5s, 15);
 
   const result = {
-    [`${pairIdx}-0`]: bars5s.slice(-300),
-    [`${pairIdx}-1`]: fullBars15s.slice(-300),
-    [`${pairIdx}-2`]: fullBars30s.slice(-300),
-    [`${pairIdx}-3`]: fullBars1m.slice(-300),
-    [`${pairIdx}-4`]: fullBars5m.slice(-300),
-    [`${pairIdx}-5`]: fullBars15m.slice(-300),
-    [`${pairIdx}-6`]: fullBars30m.slice(-300),
-    [`${pairIdx}-7`]: fullBars1h.slice(-300),
-    [`${pairIdx}-8`]: fullBars4h.slice(-300),
-    [`${pairIdx}-9`]: fullBars1d.slice(-300)
+    [`${pairIdx}-0`]: bars5s.slice(-500),
+    [`${pairIdx}-1`]: fullBars15s.slice(-500),
+    [`${pairIdx}-2`]: fullBars30s.slice(-500),
+    [`${pairIdx}-3`]: fullBars1m.slice(-500),
+    [`${pairIdx}-4`]: fullBars5m.slice(-500),
+    [`${pairIdx}-5`]: fullBars15m.slice(-500),
+    [`${pairIdx}-6`]: fullBars30m.slice(-500),
+    [`${pairIdx}-7`]: fullBars1h.slice(-500),
+    [`${pairIdx}-8`]: fullBars4h.slice(-500),
+    [`${pairIdx}-9`]: fullBars1d.slice(-500)
   };
 
   return result;
@@ -1429,7 +1409,7 @@ function TradingGame() {
     if (!interval) return;
 
     const key = `${pairIdx}-${tfIdx}`;
-    liveCryptoFeed.fetchKlines(pair.symbol, interval, 120).then(klines => {
+    liveCryptoFeed.fetchKlines(pair.symbol, interval, 500).then(klines => {
       if (klines && klines.length > 0) {
         setCandlesticksByTf(prev => {
           const next = { ...prev, [key]: klines };
@@ -1796,7 +1776,7 @@ function TradingGame() {
         // ignore
       }
     }
-    return { ema20: true, ema50: true, ema200: false, bollinger: false };
+    return { ema20: true, ema50: true, ema200: true, bollinger: false };
   });
 
   const toggleIndicator = useCallback((key) => {
@@ -2187,7 +2167,11 @@ function TradingGame() {
       if (Math.hypot(dx, dy) > 3) {
         wasDraggingRef.current = true;
       }
-      const nextPanX = panStartRef.current.startPanX + dx;
+      const rawNextPanX = panStartRef.current.startPanX + dx;
+      const slotW = coords.slotWidth || 10;
+      const minPanX = -30 * slotW;
+      const maxPanX = Math.max(0, ((activeCandles?.length || 500) - 10) * slotW);
+      const nextPanX = Math.max(minPanX, Math.min(maxPanX, rawNextPanX));
       setChartPanX(nextPanX);
 
       const pRange = panStartRef.current.priceRange || coords.priceRange || 1;
@@ -2441,7 +2425,11 @@ function TradingGame() {
     if (Math.hypot(dx, dy) > 3) {
       wasDraggingRef.current = true;
     }
-    const nextPanX = panStartRef.current.startPanX + dx;
+    const rawNextPanX = panStartRef.current.startPanX + dx;
+    const slotW = (chartCoordsRef.current?.slotWidth) || 10;
+    const minPanX = -30 * slotW;
+    const maxPanX = Math.max(0, ((activeCandles?.length || 500) - 10) * slotW);
+    const nextPanX = Math.max(minPanX, Math.min(maxPanX, rawNextPanX));
     setChartPanX(nextPanX);
 
     const pRange = panStartRef.current.priceRange || 1;
@@ -2808,7 +2796,7 @@ function TradingGame() {
     if (candlesticksByTfRef.current && typeof candlesticksByTfRef.current === 'object') {
       for (const [k, arr] of Object.entries(candlesticksByTfRef.current)) {
         if (Array.isArray(arr) && arr.length > 0) {
-          trimmedCandles[k] = arr.slice(-100);
+          trimmedCandles[k] = arr.slice(-500);
         }
       }
     }
@@ -2903,7 +2891,7 @@ function TradingGame() {
   // is instantaneous, 100% synchronous, and shares the exact same tick stream without changing prices or PnL.
   useEffect(() => {
     const key = `${selectedPairIdx}-${selectedTfIdx}`;
-    if (!candlesticksByTf[key] || candlesticksByTf[key].length === 0) {
+    if (!candlesticksByTf[key] || candlesticksByTf[key].length < 400) {
       initCandlesForPairAndTf(selectedPairIdx, selectedTfIdx);
     }
     const pair = MARKET_PAIRS[selectedPairIdx];
@@ -3060,8 +3048,10 @@ function TradingGame() {
   const activeCandles = useMemo(() => {
     const key = `${selectedPairIdx}-${selectedTfIdx}`;
     const fromState = candlesticksByTf[key];
-    if (fromState && fromState.length > 0) return fromState;
+    if (fromState && fromState.length >= 400) return fromState;
     const fromRef = candlesticksByTfRef.current[key];
+    if (fromRef && fromRef.length >= 400) return fromRef;
+    if (fromState && fromState.length > 0) return fromState;
     if (fromRef && fromRef.length > 0) return fromRef;
 
     // Safety net: Always immediately guarantee a populated candle stream
@@ -3081,12 +3071,14 @@ function TradingGame() {
     const targetCandleCount = Math.max(12, Math.min(activeCandles.length, Math.round(baseCandles / chartXZoom)));
     const slotWidth = chartWidth / targetCandleCount;
     const lastIdx = activeCandles.length - 1;
+    const rightMarginPx = 6 * slotWidth;
+    const lastCandleBaseX = chartWidth - rightMarginPx - slotWidth * 0.5 + chartPanX;
 
     if (mousePos.x !== null && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       const actualChartWidth = rect.width - 80;
       if (mousePos.x <= actualChartWidth && mousePos.x >= 0) {
-        const candleOffsetFromLast = (mousePos.x - chartPanX - (actualChartWidth - slotWidth * 0.5)) / slotWidth;
+        const candleOffsetFromLast = (mousePos.x - lastCandleBaseX) / slotWidth;
         const hoveredIdx = Math.round(lastIdx + candleOffsetFromLast);
         if (hoveredIdx >= 0 && hoveredIdx < activeCandles.length) {
           return activeCandles[hoveredIdx];
@@ -3147,12 +3139,17 @@ function TradingGame() {
     const slotWidth = chartWidth / targetCandleCount;
     const lastCandleIdx = activeCandles.length - 1;
 
-    // Direct pixel coordinate mapping with chartPanX
-    const getCandleX = (k) => chartWidth - slotWidth * 0.5 - (lastCandleIdx - k) * slotWidth + chartPanX;
+    // TradingView-Style Right Margin (6 bars breathing room by default)
+    const RIGHT_OFFSET_BARS = 6;
+    const rightMarginPx = RIGHT_OFFSET_BARS * slotWidth;
+    const lastCandleBaseX = chartWidth - rightMarginPx - slotWidth * 0.5 + chartPanX;
+
+    // Direct pixel coordinate mapping with chartPanX & right margin
+    const getCandleX = (k) => lastCandleBaseX - (lastCandleIdx - k) * slotWidth;
 
     // Filter which candles are within the visible viewport (plus 3 candles margin)
-    const minVisibleK = Math.max(0, Math.floor(lastCandleIdx - (chartWidth + 3 * slotWidth + chartPanX) / slotWidth));
-    const maxVisibleK = Math.min(lastCandleIdx, Math.ceil(lastCandleIdx - (-3 * slotWidth + chartPanX) / slotWidth));
+    const minVisibleK = Math.max(0, Math.floor(lastCandleIdx - (lastCandleBaseX + 3 * slotWidth) / slotWidth));
+    const maxVisibleK = Math.min(lastCandleIdx, Math.ceil(lastCandleIdx - (lastCandleBaseX - chartWidth - 3 * slotWidth) / slotWidth));
 
     const visibleCandleItems = [];
     for (let k = minVisibleK; k <= maxVisibleK; k++) {
@@ -3263,13 +3260,35 @@ function TradingGame() {
 
     const timeToX = (time) => {
       const candleDiff = (time - lastCandleTime) / intervalMs;
-      return (chartWidth - slotWidth * 0.5 + chartPanX) + candleDiff * slotWidth;
+      return lastCandleBaseX + candleDiff * slotWidth;
     };
 
     const xToTime = (x) => {
-      const candleDiff = (x - chartPanX - (chartWidth - slotWidth * 0.5)) / slotWidth;
+      const candleDiff = (x - lastCandleBaseX) / slotWidth;
       return Math.round(lastCandleTime + candleDiff * intervalMs);
     };
+
+    // TradingView-Style Time Grid Ticks spanning from 0 to chartWidth (including future space)
+    const niceTimeStepsMs = [
+      5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 900000, 1800000,
+      3600000, 7200000, 14400000, 21600000, 43200000, 86400000, 172800000, 604800000, 2592000000
+    ];
+    const targetPx = 95;
+    const minStepMs = Math.max(intervalMs, targetPx * (intervalMs / slotWidth));
+    const gridIntervalMs = niceTimeStepsMs.find((s) => s >= minStepMs) || niceTimeStepsMs[niceTimeStepsMs.length - 1];
+
+    const minTimeOnScreen = xToTime(0);
+    const maxTimeOnScreen = xToTime(chartWidth);
+    const firstGridTime = Math.floor(minTimeOnScreen / gridIntervalMs) * gridIntervalMs;
+    const lastGridTime = Math.ceil(maxTimeOnScreen / gridIntervalMs) * gridIntervalMs;
+
+    const timeGridTicks = [];
+    for (let t = firstGridTime; t <= lastGridTime; t += gridIntervalMs) {
+      const x = timeToX(t);
+      if (x >= 0 && x <= chartWidth) {
+        timeGridTicks.push({ time: t, x });
+      }
+    }
 
     chartCoordsRef.current = {
       minPrice,
@@ -3295,7 +3314,7 @@ function TradingGame() {
     ctx.rect(0, 0, chartWidth, chartHeight);
     ctx.clip();
 
-    // Chart grid lines horizontal
+    // Chart grid lines horizontal & vertical (TradingView standard)
     ctx.strokeStyle = '#141D2B';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 6; i++) {
@@ -3305,6 +3324,12 @@ function TradingGame() {
       ctx.lineTo(chartWidth, y);
       ctx.stroke();
     }
+    timeGridTicks.forEach((tick) => {
+      ctx.beginPath();
+      ctx.moveTo(tick.x, 0);
+      ctx.lineTo(tick.x, chartHeight);
+      ctx.stroke();
+    });
 
     // 1.1 Render Bollinger Bands Cloud & Lines (Under Candlesticks)
     if (indicators.bollinger && indicatorData?.bollinger) {
@@ -3906,22 +3931,18 @@ function TradingGame() {
     };
 
     const currentTf = TIMEFRAMES[selectedTfIdx] || TIMEFRAMES[0];
-    if (visibleCandleItems.length > 0) {
-      ctx.fillStyle = '#64748B';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      const step = Math.max(1, Math.floor(visibleCandleItems.length / 6));
-      let lastDrawnX = -999;
-      const minDistance = 75; // minimum horizontal pixels between time labels to avoid jumbled overlap
-      for (let i = 0; i < visibleCandleItems.length; i += step) {
-        const item = visibleCandleItems[i];
-        if (item.x >= 35 && item.x <= chartWidth - 35 && (item.x - lastDrawnX) >= minDistance) {
-          ctx.fillText(formatCandleTime(item.candle.time, currentTf.seconds), item.x, chartHeight + 16);
-          lastDrawnX = item.x;
-        }
+    ctx.fillStyle = '#64748B';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    let lastDrawnX = -999;
+    const minDistance = 70; // minimum horizontal pixels between time labels to avoid jumbled overlap
+    timeGridTicks.forEach((tick) => {
+      if (tick.x >= 35 && tick.x <= chartWidth - 35 && (tick.x - lastDrawnX) >= minDistance) {
+        ctx.fillText(formatCandleTime(tick.time, currentTf.seconds), tick.x, chartHeight + 16);
+        lastDrawnX = tick.x;
       }
-      ctx.textAlign = 'left';
-    }
+    });
+    ctx.textAlign = 'left';
 
     // =========================================================================
     // 4. CROSSHAIR & HOVER TIME/PRICE TOOLTIPS
@@ -4048,7 +4069,7 @@ function TradingGame() {
                 ...list.slice(0, -1),
                 { ...last, close: pPrice, high: Math.max(last.high, pPrice),
                   low: Math.min(last.low, pPrice) }
-              ] : [...list.slice(-299), {
+              ] : [...list.slice(-499), {
                 open: last.close, close: pPrice,
                 high: Math.max(last.close, pPrice), low: Math.min(last.close, pPrice), time
               }];

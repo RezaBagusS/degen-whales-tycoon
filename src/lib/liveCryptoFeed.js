@@ -207,7 +207,7 @@ class LiveCryptoFeed {
    * Fetch real historical candlesticks for a real crypto pair (e.g. SOLUSDT)
    * interval: '5m', '15m', '1h', '4h', '1d'
    */
-  async fetchKlines(pairSymbol, interval = '1d', limit = 100) {
+  async fetchKlines(pairSymbol, interval = '1d', limit = 500) {
     const rawSymbol = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k] === pairSymbol);
     if (!rawSymbol) return null;
 
