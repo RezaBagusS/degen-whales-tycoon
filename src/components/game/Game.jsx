@@ -659,31 +659,51 @@ const NEWS_TICKER_ITEMS = [
 ];
 
 const MARKET_PAIRS = [
-  { symbol: 'DEGEN/USDT', name: 'Degen Whale Token', basePrice: 420.69, vol: 0.00035, category: 'degen', precision: 4, marketType: 'degen_perps' },
-  { symbol: 'GORENG/IDR', name: 'Gorengan Saham IDR', basePrice: 1250.0, vol: 0.00050, category: 'degen', precision: 4, marketType: 'degen_perps' },
-  { symbol: 'WHALE/USD', name: 'Whale Syndicate Index', basePrice: 69420.0, vol: 0.00012, category: 'top', precision: 4, marketType: 'degen_perps' },
-  { symbol: 'BTC/USDT', name: 'Bitcoin', basePrice: 67450.0, vol: 0.00015, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'BTCUSDT' },
-  { symbol: 'ETH/USDT', name: 'Ethereum', basePrice: 3480.0, vol: 0.00022, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'ETHUSDT' },
-  { symbol: 'SOL/USDT', name: 'Solana', basePrice: 106.50, vol: 0.00032, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'SOLUSDT' },
-  { symbol: 'BNB/USDT', name: 'Binance Coin', basePrice: 585.00, vol: 0.00020, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'BNBUSDT' },
+  { symbol: 'DEGEN/USDT', name: 'Degen Whale Token', basePrice: 420.69, vol: 0.00035, category: 'degen', precision: 2, marketType: 'degen_perps' },
+  { symbol: 'GORENG/IDR', name: 'Gorengan Saham IDR', basePrice: 1250.0, vol: 0.00050, category: 'degen', precision: 2, marketType: 'degen_perps' },
+  { symbol: 'WHALE/USD', name: 'Whale Syndicate Index', basePrice: 69420.0, vol: 0.00012, category: 'top', precision: 2, marketType: 'degen_perps' },
+  { symbol: 'BTC/USDT', name: 'Bitcoin', basePrice: 67450.0, vol: 0.00015, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'BTCUSDT' },
+  { symbol: 'ETH/USDT', name: 'Ethereum', basePrice: 3480.0, vol: 0.00022, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'ETHUSDT' },
+  { symbol: 'SOL/USDT', name: 'Solana', basePrice: 106.50, vol: 0.00032, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'SOLUSDT' },
+  { symbol: 'BNB/USDT', name: 'Binance Coin', basePrice: 585.00, vol: 0.00020, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'BNBUSDT' },
   { symbol: 'DOGE/USDT', name: 'Dogecoin', basePrice: 0.1521, vol: 0.00045, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'DOGEUSDT' },
-  { symbol: 'AVAX/USDT', name: 'Avalanche', basePrice: 28.50, vol: 0.00035, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'AVAXUSDT' },
-  { symbol: 'LINK/USDT', name: 'Chainlink', basePrice: 11.80, vol: 0.00030, category: 'top', precision: 4, marketType: 'crypto_real', liveTicker: 'LINKUSDT' }
+  { symbol: 'AVAX/USDT', name: 'Avalanche', basePrice: 28.50, vol: 0.00035, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'AVAXUSDT' },
+  { symbol: 'LINK/USDT', name: 'Chainlink', basePrice: 11.80, vol: 0.00030, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'LINKUSDT' }
 ];
 
-// Standard precision for all trading pairs - 4 decimals across all pairs matching DOGE/USDT
+// Precision for trading pairs:
+// - degen_perps: strictly 2 decimal places ($420.69, $1250.00, $69420.00)
+// - crypto_real: follows real live market data precision (DOGE = 4 decimals, BTC/ETH/SOL/BNB/AVAX/LINK = 2 decimals)
 export const getPairPrecision = (pairOrSymbol, price = null) => {
-  return 4;
+  let pair = null;
+  if (typeof pairOrSymbol === 'string') {
+    pair = MARKET_PAIRS.find((p) => p.symbol === pairOrSymbol);
+  } else if (pairOrSymbol && typeof pairOrSymbol === 'object') {
+    pair = pairOrSymbol;
+  }
+  if (pair) {
+    if (pair.marketType === 'degen_perps') return 2;
+    if (pair.symbol === 'DOGE/USDT' || (price !== null && price < 1)) return 4;
+    if (typeof pair.precision === 'number') return pair.precision;
+  }
+  const checkPrice = price !== null && !isNaN(price) ? Math.abs(price) : (pair?.basePrice || 100);
+  if (checkPrice < 1) return 4;
+  return 2;
 };
 
-// Price axis precision - uniform 4 decimals across all pairs
-export const getDynamicAxisPrecision = (priceRange, basePrecision = 4) => {
-  return 4;
+// Dynamic chart price axis precision
+export const getDynamicAxisPrecision = (priceRange, basePrecision = 2) => {
+  if (!priceRange || priceRange <= 0) return basePrecision;
+  const step = priceRange / 6;
+  if (step < 0.002) return Math.max(basePrecision, 4);
+  if (step < 0.02) return Math.max(basePrecision, 3);
+  return basePrecision;
 };
 
-export const formatPairPrice = (price, decimals = 4) => {
-  if (price === null || price === undefined || isNaN(price)) return '$0.0000';
-  return `$${Number(price).toFixed(decimals)}`;
+export const formatPairPrice = (price, decimals = null) => {
+  if (price === null || price === undefined || isNaN(price)) return '$0.00';
+  const dec = typeof decimals === 'number' ? decimals : 2;
+  return `$${Number(price).toFixed(dec)}`;
 };
 
 
@@ -1850,24 +1870,31 @@ function TradingGame() {
     return currentPairDrawings.find((d) => d.id === selectedDrawingId) || null;
   }, [selectedDrawingId, currentPairDrawings]);
 
-  // Synchronized 24h trend calculation: uses the 1D candle open price of today
-  // ensuring that when the 1D daily candle is green (close >= open), 24h trend is strictly positive (+) green.
+  // Persistent, stable 24h baseline reference prices for degen_perps
+  // Prevents erratic glitching / jumping on every tick or render
+  const degen24hBaselineRef = useRef({});
+
+  // Synchronized 24h trend calculation:
+  // - crypto_real: uses live 24h open from Binance
+  // - degen_perps: uses stable baseline price to ensure smooth, non-glitching percentage changes
   const getPair24hStats = useCallback((pIdx, priceOverride = null) => {
     const pair = MARKET_PAIRS[pIdx] || MARKET_PAIRS[0];
     const liveP = priceOverride !== null ? priceOverride : (marketPricesRef.current?.[pIdx] ?? pair.basePrice);
-    const dailyKey = `${pIdx}-9`;
-    let dailyList = candlesticksByTfRef.current?.[dailyKey];
-    if (!dailyList || dailyList.length === 0) {
-      const syncMap = generateSynchronousCandlesForPair(pIdx, liveP);
-      candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
-      dailyList = syncMap[dailyKey];
+
+    let open24h = pair.basePrice;
+    if (pair.marketType === 'crypto_real') {
+      const liveStats = liveCryptoStatsRef.current?.[pair.symbol];
+      if (liveStats && Number.isFinite(liveStats.open24h) && liveStats.open24h > 0) {
+        open24h = liveStats.open24h;
+      }
+    } else {
+      if (!degen24hBaselineRef.current[pIdx]) {
+        const offsets = { 0: 0.968, 1: 1.025, 2: 0.985 };
+        degen24hBaselineRef.current[pIdx] = Number((pair.basePrice * (offsets[pIdx] || 0.98)).toFixed(2));
+      }
+      open24h = degen24hBaselineRef.current[pIdx];
     }
-    const lastBar = dailyList && dailyList.length > 0 ? dailyList[dailyList.length - 1] : null;
-    let open24h = (lastBar && Number.isFinite(lastBar.open) && lastBar.open > 0) ? lastBar.open : pair.basePrice;
-    const liveStats = liveCryptoStatsRef.current?.[pair.symbol];
-    if (pair.marketType === 'crypto_real' && liveStats && Number.isFinite(liveStats.open24h) && liveStats.open24h > 0) {
-      open24h = liveStats.open24h;
-    }
+
     const changeDollar = liveP - open24h;
     const changePct = open24h > 0 ? (changeDollar / open24h) * 100 : 0;
     return {
@@ -5696,9 +5723,9 @@ function TradingGame() {
                       {/* Table Header */}
                       <div className="flex items-center justify-between px-3.5 py-1.5 text-[10px] font-mono text-slate-400 uppercase tracking-wider border-b border-slate-800/60 bg-[#080C14]">
                         <span className="flex-1">{t.tableHeaderPair || 'Pasangan'}</span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="w-20 text-right">{t.tableHeaderPrice || 'Harga'}</span>
-                          <span className="w-[66px] text-right">{t.tableHeaderTrend || '24j Trend'}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="w-24 text-right">{t.tableHeaderPrice || 'Harga'}</span>
+                          <span className="w-[68px] text-right">{t.tableHeaderTrend || '24j Trend'}</span>
                         </div>
                       </div>
 
@@ -5779,12 +5806,12 @@ function TradingGame() {
                                 </div>
 
                                 {/* Right: Price & 24h Trend Pill */}
-                                <div className="flex items-center gap-2.5 shrink-0 text-right">
-                                  <span className="w-20 font-mono font-semibold text-xs sm:text-sm text-slate-100 tabular-nums">
+                                <div className="flex items-center gap-2 shrink-0 text-right">
+                                  <span className="w-24 text-right font-mono font-semibold text-xs sm:text-sm text-slate-100 tabular-nums">
                                     {formatPairPrice(livePrice, getPairPrecision(pair, livePrice))}
                                   </span>
                                   <span
-                                    className={`w-[66px] text-center px-1.5 py-1 rounded-md text-[10px] sm:text-[11px] font-mono font-bold tabular-nums shrink-0 ${
+                                    className={`w-[68px] text-center px-1.5 py-1 rounded-md text-[10px] sm:text-[11px] font-mono font-bold tabular-nums shrink-0 ${
                                       isGreen
                                         ? 'bg-emerald-500/15 text-[#00FF88] border border-emerald-500/25'
                                         : 'bg-rose-500/15 text-[#FF3366] border border-rose-500/25'
@@ -5811,15 +5838,15 @@ function TradingGame() {
                 </div>
 
                 {/* Right: Live Price, 24h Trend Pill & Sidebar Toggle */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="text-right">
-                    <span data-testid="price" className="text-sm sm:text-base font-mono font-extrabold text-[#00FF88]">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <div className="text-right shrink-0">
+                    <span data-testid="price" className="text-sm sm:text-base font-mono font-extrabold text-[#00FF88] block leading-tight">
                       {formatPairPrice(currentPrice, getPairPrecision(MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0], currentPrice))}
                     </span>
                     {(() => {
                       const { changePct, isUp } = getPair24hStats(selectedPairIdx, currentPrice);
                       return (
-                        <div className={`text-[10px] font-mono font-bold ${isUp ? 'text-[#00FF88]' : 'text-[#FF3366]'}`}>
+                        <div className={`text-[10px] font-mono font-bold leading-tight mt-0.5 ${isUp ? 'text-[#00FF88]' : 'text-[#FF3366]'}`}>
                           {isUp ? '▲ +' : '▼ '}{changePct.toFixed(2)}%
                         </div>
                       );
@@ -6263,12 +6290,12 @@ function TradingGame() {
                   AUTO
                 </button>
               )}
-              <div className="absolute top-2.5 left-12 sm:left-14 flex flex-wrap items-center gap-2 pointer-events-none">
-                <span className="px-2 py-0.5 rounded bg-slate-900/85 border border-slate-700 text-[10px] font-mono text-sky-400 font-bold">
+              <div className="absolute top-2 left-11 sm:left-14 max-w-[calc(100%-80px)] flex flex-wrap items-center gap-1.5 pointer-events-none z-10">
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-900/85 border border-slate-700 text-[9px] sm:text-[10px] font-mono text-sky-400 font-bold">
                   TF: {TIMEFRAMES[selectedTfIdx].label}
                 </span>
                 {displayCandle && (
-                  <div className="flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-slate-950/90 border border-slate-700/80 text-[10px] font-mono shadow-md">
+                  <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-700/80 text-[9px] sm:text-[10px] font-mono shadow-md">
                     {(() => {
                       const curPairPrec = getPairPrecision(MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0], currentPrice);
                       return (
@@ -6283,7 +6310,7 @@ function TradingGame() {
                   </div>
                 )}
                 {activePosition && activePosition.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol && (
-                  <div className="flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-slate-950/90 border border-slate-700/80 backdrop-blur-sm text-[10px] font-mono shadow-md">
+                  <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-700/80 backdrop-blur-sm text-[9px] sm:text-[10px] font-mono shadow-md">
                     <span className="flex items-center gap-1 font-bold">
                       <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${activePosition.type === 'LONG' ? 'bg-[#00FF88]' : 'bg-[#FF3366]'}`} />
                       <span className={activePosition.type === 'LONG' ? 'text-[#00FF88]' : 'text-[#FF3366]'}>
