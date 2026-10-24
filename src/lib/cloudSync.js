@@ -4,31 +4,48 @@
  */
 
 let lastSyncTimestamp = 0;
-const SYNC_DEBOUNCE_MS = 10000; // Sync to DB max once every 10 seconds
+const SYNC_DEBOUNCE_MS = 5000; // Sync to DB max once every 5 seconds
 
-export async function syncGameProgressToDB(gameState, username = 'anon_degen') {
-  if (typeof window === 'undefined') return;
+/**
+ * Fetch current authenticated user
+ */
+export async function fetchCurrentUser() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        return {
+          user: data.user,
+          save: data.save
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sync game state to database
+ */
+export async function syncGameProgressToDB(gameState, force = false) {
+  if (typeof window === 'undefined') return null;
 
   const now = Date.now();
-  if (now - lastSyncTimestamp < SYNC_DEBOUNCE_MS) {
-    return;
+  if (!force && now - lastSyncTimestamp < SYNC_DEBOUNCE_MS) {
+    return null;
   }
   lastSyncTimestamp = now;
 
   try {
     const payload = {
-      username,
-      state: {
-        cash: gameState.cash,
-        peakNetWorth: gameState.peakNetWorth,
-        whaleTokens: gameState.whaleTokens,
-        currentLocationLevel: gameState.currentLocation?.level || gameState.currentLocationLevel || 1,
-        upgrades: gameState.upgrades,
-        inventory: gameState.inventory,
-        activeEffects: gameState.activeEffects,
-        activePosition: gameState.activePosition,
-        tradeHistory: gameState.history?.slice(0, 50) || []
-      }
+      state: gameState
     };
 
     const res = await fetch('/api/user/save', {
@@ -45,5 +62,41 @@ export async function syncGameProgressToDB(gameState, username = 'anon_degen') {
     // Fail silently in background if DB is not active or container offline
     // LocalStorage remains 100% active and dependable
     return null;
+  }
+}
+
+/**
+ * Load cloud save for current session or username
+ */
+export async function loadGameProgressFromDB(username = null) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const url = username ? `/api/user/load?username=${encodeURIComponent(username)}` : '/api/user/load';
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.found && data.save) {
+        return data;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Logout user
+ */
+export async function logoutUser() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
   }
 }

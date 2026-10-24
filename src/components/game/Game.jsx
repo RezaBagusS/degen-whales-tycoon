@@ -72,7 +72,10 @@ import {
   ShoppingBag,
   Store,
   Heart,
-  ExternalLink
+  ExternalLink,
+  User,
+  Cloud,
+  LogOut
 } from 'lucide-react';
 import { TRANSLATIONS } from '../../i18n/translations';
 import { BlackMarketTab, InventoryQuickBar, BLACK_MARKET_ITEMS } from './BlackMarket';
@@ -82,7 +85,7 @@ import { DegenShop } from './DegenShop';
 import { ADS_CONFIG } from '../../config/adsConfig';
 import RewardedAdModal from './RewardedAdModal';
 import CreditsModal from './CreditsModal';
-import { syncGameProgressToDB } from '../../lib/cloudSync';
+import { syncGameProgressToDB, fetchCurrentUser, logoutUser, loadGameProgressFromDB } from '../../lib/cloudSync';
 import { liveCryptoFeed } from '../../lib/liveCryptoFeed';
 import {
   getMemeLaunchpadSchedule,
@@ -1318,6 +1321,8 @@ function TradingGame() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeTab, setActiveTab] = useState('quests');
   const [toastMessage, setToastMessage] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Feature 1: Black Market Inventory & Power-Up States
   const [inventory, setInventory] = useState(initial.inventory || {
@@ -1662,6 +1667,100 @@ function TradingGame() {
   const triggerToast = useCallback((msg, type = 'info') => {
     setToastMessage({ msg, type, id: Date.now() });
   }, []);
+
+  // Cloud Sync & Account State Hydration
+  useEffect(() => {
+    let mounted = true;
+    fetchCurrentUser().then((data) => {
+      if (!mounted) return;
+      if (data?.user) {
+        setCurrentUser(data.user);
+        const cloudSave = data.save?.savePayload;
+        if (cloudSave && typeof cloudSave === 'object') {
+          try {
+            const rawLocal = localStorage.getItem(SAVE_KEY);
+            let needsHydration = false;
+            if (!rawLocal) {
+              needsHydration = true;
+            } else {
+              const localParsed = JSON.parse(rawLocal);
+              const localPeak = Number(localParsed.peakNetWorth || 0);
+              const cloudPeak = Number(cloudSave.peakNetWorth || 0);
+              const localWhale = Number(localParsed.whaleTokens || 0);
+              const cloudWhale = Number(cloudSave.whaleTokens || 0);
+              // If local is default brand-new ($10 / 0 whale tokens) and cloud has actual gameplay progress
+              if ((localPeak <= 10 && cloudPeak > 10) || (localWhale === 0 && cloudWhale > 0)) {
+                needsHydration = true;
+              }
+            }
+
+            if (needsHydration) {
+              localStorage.setItem(SAVE_KEY, JSON.stringify(cloudSave));
+              triggerToast(`Akun @${data.user.username} terdeteksi! Memulihkan data game dari cloud...`, 'success');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1200);
+            }
+          } catch (e) {
+            console.error('Auto cloud hydration check error:', e);
+          }
+        }
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [triggerToast]);
+
+  const handleManualCloudSync = useCallback(async () => {
+    if (!currentUser || isSyncingCloud) return;
+    setIsSyncingCloud(true);
+    try {
+      if (!latest.current) return;
+      const res = await syncGameProgressToDB(latest.current, true);
+      if (res?.success) {
+        triggerToast(`Progres game tersinkronkan ke Cloud Akun @${currentUser.username}!`, 'success');
+      } else {
+        triggerToast('Gagal sinkronisasi ke cloud server.', 'warning');
+      }
+    } catch {
+      triggerToast('Gagal terhubung ke cloud server.', 'danger');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  }, [currentUser, isSyncingCloud, triggerToast]);
+
+  const handleManualCloudLoad = useCallback(async () => {
+    if (!currentUser) return;
+    if (typeof window === 'undefined') return;
+    if (!window.confirm('Muat ulang data dari Cloud? Data di browser ini akan digantikan oleh simpanan Cloud terakhir.')) {
+      return;
+    }
+    try {
+      const data = await loadGameProgressFromDB();
+      if (data?.save?.savePayload) {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data.save.savePayload));
+        triggerToast('Progres Cloud berhasil dipulihkan! Me-refresh game...', 'success');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        triggerToast('Tidak ditemukan file save cloud pada akun ini.', 'warning');
+      }
+    } catch {
+      triggerToast('Gagal mengambil file save dari cloud.', 'danger');
+    }
+  }, [currentUser, triggerToast]);
+
+  const handleUserLogout = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!window.confirm('Yakin ingin keluar dari akun @' + (currentUser?.username || '') + '?')) {
+      return;
+    }
+    const ok = await logoutUser();
+    if (ok) {
+      setCurrentUser(null);
+      triggerToast('Berhasil keluar dari akun.', 'info');
+    }
+  }, [currentUser, triggerToast]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -4810,6 +4909,31 @@ function TradingGame() {
               <span className="hidden sm:inline">{language === 'en' ? 'Support Dev' : 'Traktir Dev'}</span>
             </a>
 
+            {/* User Account / Cloud Sync Badge */}
+            {currentUser ? (
+              <button
+                data-testid="btn-account-status"
+                onClick={() => { setConfirmReset(false); setShowSettingsModal(true); }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/50 transition-all cursor-pointer shadow-sm active:scale-95"
+                title={`Akun: @${currentUser.username} (Tersinkron Cloud - Klik untuk pengaturan akun)`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <User className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="max-w-[70px] sm:max-w-[100px] truncate">@{currentUser.username}</span>
+                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+              </button>
+            ) : (
+              <a
+                data-testid="btn-auth-link"
+                href="/auth?mode=login"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-600/20 to-emerald-600/20 hover:from-cyan-600/30 hover:to-emerald-600/30 text-cyan-300 border border-cyan-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Masuk / Daftar Akun untuk Simpan Progres Lintas Browser"
+              >
+                <User className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">{language === 'en' ? 'Sign In' : 'Masuk Akun'}</span>
+              </a>
+            )}
+
             <button
               aria-label={isMuted ? (language === 'en' ? 'Unmute Sound' : 'Aktifkan Suara Game') : (language === 'en' ? 'Mute Sound' : 'Matikan Suara Game')}
               title={isMuted ? (language === 'en' ? 'Sound: MUTED (Click to activate)' : 'Suara Game: MATI (Klik untuk aktifkan audio synth)') : (language === 'en' ? 'Sound: ON (Click to mute)' : 'Suara Game: NYALA (Klik untuk mute)')}
@@ -7134,6 +7258,80 @@ function TradingGame() {
               <div className="font-bold text-slate-300 mb-1">{t.settingsAutoSaveTitle || 'Progres tersimpan otomatis'}</div>
               <p>{t.settingsAutoSaveDesc || 'Save setiap 3 detik, setelah transaksi, dan saat meninggalkan halaman. Simpanan versi lama dimigrasikan otomatis di browser dan alamat yang sama.'}</p>
               <p>{t.settingsOfflineDesc || 'Penghasilan saat game ditutup: maksimal 8 jam, tanpa bonus event. Harga posisi dijeda selama game ditutup.'}</p>
+            </div>
+
+            {/* Account & Cross-Browser Cloud Sync */}
+            <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-cyan-500/30 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-cyan-400" />
+                  <span>{language === 'en' ? 'Account & Cloud Sync (Cross-Browser)' : 'Akun & Cloud Sync (Lintas Browser)'}</span>
+                </div>
+                {currentUser ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Tersinkron
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold border border-amber-500/30">
+                    Akun Tamu
+                  </span>
+                )}
+              </div>
+
+              {currentUser ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-slate-300 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                    <div>
+                      <div className="font-bold text-emerald-300 font-mono flex items-center gap-1">
+                        <span>@{currentUser.username}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {language === 'en' ? 'Progress is auto-synced to cloud' : 'Progres game tersinkron aman ke cloud'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleManualCloudSync}
+                      disabled={isSyncingCloud}
+                      className="px-2.5 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all active:scale-95"
+                    >
+                      <Cloud className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-bounce' : ''}`} />
+                      <span>{isSyncingCloud ? 'Syncing...' : (language === 'en' ? 'Sync Now' : 'Backup Cloud')}</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={handleManualCloudLoad}
+                      className="text-cyan-400 hover:text-cyan-300 underline text-[11px] cursor-pointer"
+                    >
+                      {language === 'en' ? 'Restore from Cloud' : 'Pulihkan Save dari Cloud'}
+                    </button>
+                    <button
+                      onClick={handleUserLogout}
+                      className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[11px] cursor-pointer"
+                    >
+                      <LogOut className="w-3 h-3" />
+                      <span>{language === 'en' ? 'Log Out' : 'Keluar Akun'}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    {language === 'en'
+                      ? 'You are playing as Guest. Register an account so your trading history, levels, and tokens do not get lost when switching browsers or devices.'
+                      : 'Kamu bermain sebagai Tamu. Buat akun agar riwayat trading, level pasif, dan Whale Token tidak hilang saat kamu ganti browser atau ganti HP.'}
+                  </p>
+                  <a
+                    href="/auth?mode=login"
+                    className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-black font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>{language === 'en' ? 'Sign In / Register Account' : 'Masuk / Buat Akun Cloud'}</span>
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Language Selection */}

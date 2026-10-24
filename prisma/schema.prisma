@@ -9,6 +9,7 @@ generator client {
 model User {
   id            String       @id @default(uuid())
   username      String       @unique
+  passwordHash  String?
   walletAddress String?      @unique
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -36,6 +37,7 @@ model GameSave {
   activeEffects        Json     @default("{\"zeroFeeUntil\":0,\"has250xTicket\":false,\"radarUntil\":0}")
   activePosition       Json?
   tradeHistory         Json     @default("[]")
+  savePayload          Json?
 
   lastSavedAt          DateTime @default(now())
   updatedAt            DateTime @updatedAt

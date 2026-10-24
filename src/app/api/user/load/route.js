@@ -1,18 +1,34 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { verifySessionToken, COOKIE_NAME } from '../../../../lib/auth';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const username = searchParams.get('username') || 'anon_degen';
+    let username = searchParams.get('username');
+    let userId = null;
 
-    const user = await prisma.user.findUnique({
-      where: { username },
-      include: {
-        save: true,
-        syndicate: true
+    // Check session cookie first
+    const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
+    if (sessionCookie) {
+      const payload = verifySessionToken(sessionCookie);
+      if (payload && payload.userId) {
+        userId = payload.userId;
       }
-    });
+    }
+
+    let user;
+    if (userId) {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { save: true, syndicate: true }
+      });
+    } else if (username) {
+      user = await prisma.user.findUnique({
+        where: { username },
+        include: { save: true, syndicate: true }
+      });
+    }
 
     if (!user || !user.save) {
       return NextResponse.json({
@@ -25,7 +41,7 @@ export async function GET(request) {
       found: true,
       username: user.username,
       syndicate: user.syndicate,
-      save: user.save
+      save: user.save.savePayload || user.save
     });
   } catch (error) {
     console.error('Error loading game progress from DB:', error);
