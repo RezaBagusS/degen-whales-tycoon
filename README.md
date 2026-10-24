@@ -3,10 +3,11 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/PLAY_NOW-degen--whales--tycoon.vercel.app-00FF88?style=for-the-badge&logo=vercel&logoColor=black)](https://degen-whales-tycoon.vercel.app)
-[![Version](https://img.shields.io/badge/version-1.3.1_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
+[![Version](https://img.shields.io/badge/version-1.4.0_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
 [![License](https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js_16-Turbopack-white?style=for-the-badge&logo=next.js&logoColor=black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React_19-Client_Engine-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Database](https://img.shields.io/badge/Neon-Serverless_Postgres-00E599?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
 
 **An immersive, high-stakes idle trading floor tycoon where you rise from a broke retail trader in a dusty boarding room into a market-manipulating crypto Whale.**
 
@@ -69,6 +70,13 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 - Convert your temporary empire into permanent **Whale Tokens**.
 - Each Whale Token grants a **+0.50x global multiplier** and a **lifetime passive dividend of +$5.00/s** that persists across all future resets.
 
+### ☁️ 7. Player Accounts & Cross-Device Cloud Sync
+- **Seamless Registration & Login**: Play anonymously as a guest or create a secure cloud account (`/auth`, `/login`, `/register`).
+- **PBKDF2 Native Security**: Zero-dependency password hashing with individual salt and HMAC-signed session cookies.
+- **Zero Progress Loss**: Full state fidelity backup (cash, upgrades, positions, ledger, drawings) saved into PostgreSQL.
+- **Instant Auto-Hydration**: Switching browsers, devices, or incognito windows automatically restores game progress without manual file imports.
+- **Dual-Database Branching**: Complete physical isolation between `dev` (development database branch) and `main` (production database branch) via Neon Serverless Postgres.
+
 ---
 
 ## 🛠️ Technology Stack
@@ -80,7 +88,10 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 | **Graphics Engine** | HTML5 Canvas 2D (Deterministic Realtime Candle Rendering) |
 | **Audio Synthesizer** | Web Audio API (Zero-asset, zero-latency procedural SFX) |
 | **State & Storage** | LocalStorage Engine `v8` with Multi-Tab BroadcastChannel synchronization |
-| **Backend & Database** | [Prisma ORM 7](https://www.prisma.io/), PostgreSQL (Optional Cloud Progress Sync) |
+| **Cloud Sync & DB** | [Prisma ORM 7](https://www.prisma.io/), [Neon PostgreSQL](https://neon.tech) (Serverless Database with Branching) |
+| **Security & Auth** | Node.js Crypto (PBKDF2, HMAC signed cookies) |
+| **Testing** | [Playwright Test Suite](https://playwright.dev/) (21 E2E tests for trading, mechanics, & state) |
+| **Deployment** | [Vercel Edge Network](https://vercel.com/) |
 | **Testing** | [Playwright Test Suite](https://playwright.dev/) (21 E2E tests for trading, mechanics, & state) |
 | **Deployment** | [Vercel Edge Network](https://vercel.com/) |
 

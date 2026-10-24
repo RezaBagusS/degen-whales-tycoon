@@ -2,10 +2,10 @@
 
 Dokumentasi game dan proyek Next.js
 
-- Versi game: **1.3.1**
-- Basis kode: **Degen & Whale Bugfix, artifact V2**
-- Tanggal dokumentasi: **17 Oktober 2026**
-- Bahasa antarmuka: Indonesia
+- Versi game: **1.4.0**
+- Basis kode: **Degen & Whale Cloud Sync Edition**
+- Tanggal dokumentasi: **24 Oktober 2026**
+- Bahasa antarmuka: Indonesia & English
 - Genre: idle tycoon dan simulasi trading fiktif
 
 > Dokumentasi ini menjelaskan implementasi yang tersedia, bukan daftar fitur yang
@@ -413,32 +413,34 @@ dana talangan = max($5, margin hilang Ã— 20%)
 
 Tidak ada iklan sungguhan, pembayaran, atau integrasi monetisasi.
 
-## 10. Save dan pendapatan ketika ditutup
+## 10. Save, Akun Cloud, dan Pendapatan ketika Ditutup
 
-### Penyimpanan
+### Sistem Penyimpanan Hibrida (LocalStorage + Cloud PostgreSQL)
 
-Game menggunakan `localStorage` browser:
+Game menggunakan arsitektur hibrida untuk menjamin pengalaman bermain yang instan, tahan offline, sekaligus tersinkronisasi lintas perangkat:
 
-- Kunci aktif: `degen_whale_save_v8`.
-- Kunci migrasi: `degen_whale_save_v7`.
-- Tidak ada database, akun, atau cloud save.
+1. **LocalStorage Browser (Lokal & Offline)**:
+   - Kunci aktif: `degen_whale_save_v8`.
+   - Kunci migrasi: `degen_whale_save_v7`.
+   - Mengamankan status game secara instan tanpa jeda jaringan setiap 3 detik, saat transaksi selesai, dan saat event `pagehide`/`visibilitychange`.
+
+2. **Akun Pemain & Cloud Database (Neon Serverless PostgreSQL)**:
+   - Pemain dapat bermain anonim sebagai Tamu (Guest) atau mendaftarkan akun di `/auth`.
+   - Password dienkripsi dengan standar industri PBKDF2 (100.000 iterasi, salt acak per pengguna, SHA-512) tanpa ketergantungan library eksternal.
+   - Sesi login dikelola lewat cookie `degen_session` yang ditandatangani HMAC-SHA256 (`HttpOnly`, `SameSite=Lax`).
+   - Seluruh payload state game (cash, peak, whale tokens, level pasif, kupon black market, posisi aktif, hingga coretan drawing chart) disimpan utuh di kolom `savePayload Json` pada tabel `GameSave`.
+   - **Auto-Hydration**: Saat pemain login di browser lain atau perangkat baru dalam kondisi localstorage kosong/default, sistem secara otomatis menarik data save terbaru dari cloud dan memulihkan sesi permainan tanpa perlu ekspor/impor file manual.
+   - **Pemisahan Database**: Menggunakan fitur database branching Neon, di mana branch `dev` (Preview) terisolasi penuh dari branch `production` (`main`).
 
 Data yang disimpan mencakup cash, peak, token, level infrastruktur, posisi aktif,
-TP/SL, hingga 20 riwayat trade, cooldown bantuan, pair/timeframe,
-harga pair, boost, event, alert likuidasi, dan timestamp.
-
-Data yang tidak dipertahankan antara lain riwayat candle lengkap
-serta beberapa pilihan sementara antarmuka.
+TP/SL, hingga 20 riwayat trade, 50 riwayat mutasi kas, cooldown bantuan, pair/timeframe,
+harga pair, boost, event, alert likuidasi, inventaris black market, dan timestamp.
 
 Save dilakukan:
-
 1. Saat game selesai diinisialisasi.
-2. Setiap tiga detik melalui interval tetap.
-3. Setelah perubahan transaksi tertentu.
+2. Setiap tiga detik melalui interval tetap (dan otomatis di-debounce ke cloud server).
+3. Setelah perubahan transaksi penting (order trading, upgrade, klaim reward, prestige).
 4. Ketika halaman disembunyikan atau menerima `pagehide`.
-
-Kegagalan storage menampilkan peringatan. Game tetap dapat dimainkan, tetapi
-progres sesi itu tidak dijamin tersimpan.
 
 ### Migrasi
 
