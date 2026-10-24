@@ -2217,10 +2217,31 @@ function TradingGame() {
         }
         setActivePosition((prev) => (prev ? { ...prev, tpPrice: newPrice } : null));
       } else if (dragTpSlRef.current.type === 'SL') {
+        const curPrice = marketPricesRef.current[selectedPairIdx] || activePosition.entryPrice;
         if (isLong) {
-          newPrice = Math.min(Number((entry * 0.998).toFixed(precision)), Math.max(Number((liq * 1.005).toFixed(precision)), newPrice));
+          // LONG SL:
+          // Min allowed: strictly above liquidation (liq * 1.002)
+          // Max allowed: can reach Entry (BEP) and even exceed Entry (SL+),
+          // capped just below current market price and TP so it doesn't trigger immediately
+          const maxAllowed = activePosition.tpPrice
+            ? Math.min(activePosition.tpPrice * 0.998, curPrice * 0.999)
+            : curPrice * 0.999;
+          const minAllowed = liq * 1.002;
+          if (maxAllowed > minAllowed) {
+            newPrice = Math.min(Number(maxAllowed.toFixed(precision)), Math.max(Number(minAllowed.toFixed(precision)), newPrice));
+          }
         } else {
-          newPrice = Math.max(Number((entry * 1.002).toFixed(precision)), Math.min(Number((liq * 0.995).toFixed(precision)), newPrice));
+          // SHORT SL:
+          // Max allowed: strictly below liquidation (liq * 0.998)
+          // Min allowed: can reach Entry (BEP) and go below Entry (SL+),
+          // floored just above current market price and TP so it doesn't trigger immediately
+          const minAllowed = activePosition.tpPrice
+            ? Math.max(activePosition.tpPrice * 1.002, curPrice * 1.001)
+            : curPrice * 1.001;
+          const maxAllowed = liq * 0.998;
+          if (maxAllowed > minAllowed) {
+            newPrice = Math.max(Number(minAllowed.toFixed(precision)), Math.min(Number(maxAllowed.toFixed(precision)), newPrice));
+          }
         }
         setActivePosition((prev) => (prev ? { ...prev, slPrice: newPrice } : null));
       }
@@ -2337,7 +2358,21 @@ function TradingGame() {
       setDraggingTpSlType(null);
       setHoveredAdjustable(null);
       playUiClick();
-      triggerToast(`Target ${type === 'TP' ? 'Take Profit (TP)' : 'Stop Loss (SL)'} berhasil digeser dan disimpan!`, 'info');
+      if (activePosition && type === 'SL') {
+        const isLong = activePosition.type === 'LONG';
+        const entry = activePosition.entryPrice;
+        const sl = activePosition.slPrice;
+        const prec = getPairPrecision(activePosition.pairSymbol, entry);
+        if (sl && Math.abs(sl - entry) <= (1 / Math.pow(10, prec))) {
+          triggerToast(`🛡️ Stop Loss diset ke Break-Even (BEP) @ ${formatPairPrice(sl, prec)}! Modal terproteksi 100%.`, 'success');
+        } else if (sl && (isLong ? sl > entry : sl < entry)) {
+          triggerToast(`🔒 Stop Loss diset ke SL+ (Kunci Cuan) @ ${formatPairPrice(sl, prec)}! Profit terkunci aman.`, 'success');
+        } else {
+          triggerToast(`Target Stop Loss (SL) berhasil digeser ke ${formatPairPrice(sl, prec)}!`, 'info');
+        }
+      } else {
+        triggerToast(`Target Take Profit (TP) berhasil digeser dan disimpan!`, 'info');
+      }
       return;
     }
 
@@ -2562,13 +2597,19 @@ function TradingGame() {
     const p = parseFloat(adjustSlInput);
     if (!p || isNaN(p) || p <= 0) return null;
     const isLong = activePosition.type === 'LONG';
-    const isValidSide = isLong ? p < activePosition.entryPrice : p > activePosition.entryPrice;
+    const curP = marketPricesRef.current[selectedPairIdx] || activePosition.entryPrice;
     const isLiqBreached = isLong ? p <= activePosition.liqPrice : p >= activePosition.liqPrice;
-    if (!isValidSide || isLiqBreached) {
+    const isCurrentPriceBreached = isLong ? p >= curP : p <= curP;
+    const isTpBreached = activePosition.tpPrice
+      ? (isLong ? p >= activePosition.tpPrice : p <= activePosition.tpPrice)
+      : false;
+
+    if (isLiqBreached || isCurrentPriceBreached || isTpBreached) {
       return {
         isValid: false,
         isLiqBreached,
-        isValidSide
+        isCurrentPriceBreached,
+        isTpBreached
       };
     }
     const est = calculatePnlEstimate(
@@ -2578,8 +2619,11 @@ function TradingGame() {
       activePosition.leverage,
       activePosition.type
     );
-    return { ...est, isValid: true };
-  }, [activePosition, adjustSlInput]);
+    const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+    const isBep = Math.abs(p - activePosition.entryPrice) <= (1 / Math.pow(10, modalPrec));
+    const isProfitLock = isLong ? p > activePosition.entryPrice : p < activePosition.entryPrice;
+    return { ...est, isValid: true, isBep, isProfitLock };
+  }, [activePosition, adjustSlInput, selectedPairIdx]);
 
   const isDailyClaimed = useMemo(() => {
     if (!lastDailyClaim || lastDailyClaim <= 0) return false;
@@ -3452,7 +3496,21 @@ function TradingGame() {
       drawPositionLineInChart(activePosition.entryPrice, '#38BDF8', 'ENTRY', false, null);
       drawPositionLineInChart(activePosition.liqPrice, '#F43F5E', 'LIQ', false, null);
       if (activePosition.tpPrice) drawPositionLineInChart(activePosition.tpPrice, '#10B981', 'TP', true, 'TP');
-      if (activePosition.slPrice) drawPositionLineInChart(activePosition.slPrice, '#F59E0B', 'SL', true, 'SL');
+      if (activePosition.slPrice) {
+        const isLong = activePosition.type === 'LONG';
+        const entry = activePosition.entryPrice;
+        const sl = activePosition.slPrice;
+        let slColor = '#F59E0B';
+        let slLabel = 'SL';
+        if (Math.abs(sl - entry) <= (1 / Math.pow(10, pairBasePrecision))) {
+          slColor = '#38BDF8';
+          slLabel = 'SL BEP';
+        } else if (isLong ? sl > entry : sl < entry) {
+          slColor = '#10B981';
+          slLabel = 'SL+';
+        }
+        drawPositionLineInChart(activePosition.slPrice, slColor, slLabel, true, 'SL');
+      }
 
       // Off-screen Liquidation Navigator Pill (TradingView-style off-chart alert)
       if (activePosition.liqPrice > maxPrice) {
@@ -3780,7 +3838,18 @@ function TradingGame() {
       drawPositionPricePill(activePosition.entryPrice, '#38BDF8');
       drawPositionPricePill(activePosition.liqPrice, '#F43F5E');
       if (activePosition.tpPrice) drawPositionPricePill(activePosition.tpPrice, '#10B981');
-      if (activePosition.slPrice) drawPositionPricePill(activePosition.slPrice, '#F59E0B');
+      if (activePosition.slPrice) {
+        const isLong = activePosition.type === 'LONG';
+        const entry = activePosition.entryPrice;
+        const sl = activePosition.slPrice;
+        let slPillColor = '#F59E0B';
+        if (Math.abs(sl - entry) <= (1 / Math.pow(10, dynamicPrecision))) {
+          slPillColor = '#38BDF8';
+        } else if (isLong ? sl > entry : sl < entry) {
+          slPillColor = '#10B981';
+        }
+        drawPositionPricePill(activePosition.slPrice, slPillColor);
+      }
     }
 
     // Current price right axis pill & countdown
@@ -4635,22 +4704,31 @@ function TradingGame() {
     }
 
     if (parsedSl !== null) {
+      const curMarketPrice = marketPricesRef.current[selectedPairIdx] || entry;
       if (isLong) {
-        if (parsedSl >= entry) {
-          setAdjustError(`SL untuk LONG harus di bawah harga entry (${formatPairPrice(entry, posPrecision)}).`);
-          return;
-        }
         if (parsedSl <= liq) {
           setAdjustError(`SL untuk LONG (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di bawah/sama dengan harga likuidasi (${formatPairPrice(liq, posPrecision)}).`);
           return;
         }
-      } else {
-        if (parsedSl <= entry) {
-          setAdjustError(`SL untuk SHORT harus di atas harga entry (${formatPairPrice(entry, posPrecision)}).`);
+        if (parsedSl >= curMarketPrice) {
+          setAdjustError(`SL untuk LONG (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di atas/sama dengan harga pasar saat ini (${formatPairPrice(curMarketPrice, posPrecision)}) karena posisi akan langsung tereksekusi.`);
           return;
         }
+        if (parsedTp !== null && parsedSl >= parsedTp) {
+          setAdjustError(`SL (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di atas/sama dengan TP (${formatPairPrice(parsedTp, posPrecision)}).`);
+          return;
+        }
+      } else {
         if (parsedSl >= liq) {
           setAdjustError(`SL untuk SHORT (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di atas/sama dengan harga likuidasi (${formatPairPrice(liq, posPrecision)}).`);
+          return;
+        }
+        if (parsedSl <= curMarketPrice) {
+          setAdjustError(`SL untuk SHORT (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di bawah/sama dengan harga pasar saat ini (${formatPairPrice(curMarketPrice, posPrecision)}) karena posisi akan langsung tereksekusi.`);
+          return;
+        }
+        if (parsedTp !== null && parsedSl <= parsedTp) {
+          setAdjustError(`SL (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di bawah/sama dengan TP (${formatPairPrice(parsedTp, posPrecision)}).`);
           return;
         }
       }
@@ -7675,8 +7753,20 @@ function TradingGame() {
               </div>
 
               {/* Preset ROI SL */}
-              <div className="flex items-center gap-1.5 pt-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 <span className="text-[10px] text-slate-500 font-mono">{t.adjustModalPreset || 'Preset:'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+                    setAdjustSlInput(activePosition.entryPrice.toFixed(modalPrec));
+                    setAdjustError('');
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 cursor-pointer transition-colors"
+                  title="Kunci Break-Even (BEP): SL sama dengan harga Entry"
+                >
+                  BEP (0%)
+                </button>
                 {[10, 25, 50, 75].map((pct) => (
                   <button
                     key={pct}
@@ -7692,22 +7782,62 @@ function TradingGame() {
               {/* Live Calculation SL */}
               {modalSlEst && (
                 modalSlEst.isValid ? (
-                  <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 flex flex-wrap items-center justify-between gap-1">
-                    <span>{t.adjustModalEstLoss || 'Est. Kerugian:'}</span>
-                    <span className="font-bold text-[#FF3366]">
-                      {formatMoney(modalSlEst.pnlDollar)} ({modalSlEst.roiPercent.toFixed(1)}% ROI)
-                    </span>
-                    <span className="w-full text-[10px] text-slate-400 border-t border-rose-500/20 pt-1 mt-0.5">
-                      {t.adjustModalRemainingCash || 'Sisa modal ke kas:'} <strong className="text-white font-semibold">{formatMoney(modalSlEst.returnCash)}</strong>
-                    </span>
-                  </div>
+                  modalSlEst.isProfitLock ? (
+                    <div className="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-mono text-emerald-300 flex flex-wrap items-center justify-between gap-1 shadow-sm">
+                      <span className="font-bold flex items-center gap-1 text-emerald-300">
+                        <span>🔒</span> SL+ (Kunci Keuntungan):
+                      </span>
+                      <span className="font-bold text-[#00FF88]">
+                        +{formatMoney(modalSlEst.pnlDollar)} (+{modalSlEst.roiPercent.toFixed(1)}% ROI)
+                      </span>
+                      <span className="w-full text-[10px] text-emerald-400/80 border-t border-emerald-500/20 pt-1 mt-0.5">
+                        Cuan terjamin! Modal + profit kembali ke kas: <strong className="text-white font-semibold">{formatMoney(modalSlEst.returnCash)}</strong>
+                      </span>
+                    </div>
+                  ) : modalSlEst.isBep ? (
+                    <div className="p-2.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-[11px] font-mono text-cyan-300 flex flex-wrap items-center justify-between gap-1 shadow-sm">
+                      <span className="font-bold flex items-center gap-1 text-cyan-300">
+                        <span>🛡️</span> SL BEP (Break-Even Point):
+                      </span>
+                      <span className="font-bold text-cyan-200">
+                        $0.00 (0.0% ROI)
+                      </span>
+                      <span className="w-full text-[10px] text-cyan-400/80 border-t border-cyan-500/20 pt-1 mt-0.5">
+                        Bebas risiko! Modal margin kembali utuh 100%: <strong className="text-white font-semibold">{formatMoney(modalSlEst.returnCash)}</strong>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 flex flex-wrap items-center justify-between gap-1">
+                      <span>{t.adjustModalEstLoss || 'Est. Kerugian:'}</span>
+                      <span className="font-bold text-[#FF3366]">
+                        {formatMoney(modalSlEst.pnlDollar)} ({modalSlEst.roiPercent.toFixed(1)}% ROI)
+                      </span>
+                      <span className="w-full text-[10px] text-slate-400 border-t border-rose-500/20 pt-1 mt-0.5">
+                        {t.adjustModalRemainingCash || 'Sisa modal ke kas:'} <strong className="text-white font-semibold">{formatMoney(modalSlEst.returnCash)}</strong>
+                      </span>
+                    </div>
+                  )
                 ) : (
                   <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-400">
                     {(() => {
                       const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-                      return modalSlEst.isLiqBreached
-                        ? (language === 'en' ? `SL cannot breach liquidation price (${formatPairPrice(activePosition.liqPrice, modalPrec)})` : `SL tidak boleh melewati harga likuidasi (${formatPairPrice(activePosition.liqPrice, modalPrec)})`)
-                        : (language === 'en' ? `SL for ${activePosition.type} must be ${activePosition.type === 'LONG' ? 'below' : 'above'} entry (${formatPairPrice(activePosition.entryPrice, modalPrec)})` : `SL untuk ${activePosition.type} harus ${activePosition.type === 'LONG' ? 'di bawah' : 'di atas'} entry (${formatPairPrice(activePosition.entryPrice, modalPrec)})`);
+                      if (modalSlEst.isLiqBreached) {
+                        return language === 'en'
+                          ? `SL cannot breach liquidation price (${formatPairPrice(activePosition.liqPrice, modalPrec)})`
+                          : `SL tidak boleh melewati harga likuidasi (${formatPairPrice(activePosition.liqPrice, modalPrec)})`;
+                      }
+                      if (modalSlEst.isCurrentPriceBreached) {
+                        const curP = marketPricesRef.current[selectedPairIdx] || activePosition.entryPrice;
+                        return language === 'en'
+                          ? `SL cannot be ${activePosition.type === 'LONG' ? 'above/equal to' : 'below/equal to'} current market price (${formatPairPrice(curP, modalPrec)})`
+                          : `SL tidak boleh ${activePosition.type === 'LONG' ? 'di atas/sama dengan' : 'di bawah/sama dengan'} harga pasar sekarang (${formatPairPrice(curP, modalPrec)}) karena akan langsung tereksekusi.`;
+                      }
+                      if (modalSlEst.isTpBreached) {
+                        return language === 'en'
+                          ? `SL cannot cross TP (${formatPairPrice(activePosition.tpPrice, modalPrec)})`
+                          : `SL tidak boleh melewati TP (${formatPairPrice(activePosition.tpPrice, modalPrec)})`;
+                      }
+                      return language === 'en' ? 'Invalid SL price' : 'Harga SL tidak valid';
                     })()}
                   </div>
                 )
