@@ -33,6 +33,7 @@ import {
   Activity,
   Flame,
   AlertTriangle,
+  Receipt,
   CheckCircle2,
   Play,
   Crown,
@@ -139,6 +140,67 @@ const hexToRgba = (hex, alpha = 1) => {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const getLogBadge = (log) => {
+  switch (log.type) {
+    case 'TRADE':
+      return { label: log.amount >= 0 ? 'TRADE WIN' : 'TRADE LOSS', color: log.amount >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400' };
+    case 'TRADE_LIQ':
+      return { label: 'LIKUIDASI', color: 'bg-rose-500/25 text-rose-400' };
+    case 'TRADE_SHIELD':
+      return { label: 'SHIELD DEFENSE', color: 'bg-amber-500/20 text-amber-400' };
+    case 'UPGRADE':
+      return { label: 'INFRA RIG', color: 'bg-blue-500/20 text-blue-400' };
+    case 'BLACK_MARKET':
+      return { label: 'PASAR GELAP', color: 'bg-purple-500/20 text-purple-400' };
+    case 'AD_CASH':
+      return { label: 'IKLAN SPONSOR', color: 'bg-teal-500/20 text-teal-400' };
+    case 'AD_BAILOUT':
+      return { label: 'DANA TALANGAN', color: 'bg-amber-500/20 text-amber-400' };
+    case 'OFFLINE_PASSIVE':
+      return { label: 'BOT OFFLINE', color: 'bg-emerald-500/20 text-emerald-400' };
+    case 'OFFLINE_2X':
+      return { label: 'GANDAKAN 2X', color: 'bg-amber-500/20 text-amber-400' };
+    case 'QUEST_MILESTONE':
+      return { label: 'HADIAH MISI', color: 'bg-yellow-500/20 text-yellow-400' };
+    case 'QUEST_DAILY':
+      return { label: 'TUGAS HARIAN', color: 'bg-emerald-500/20 text-emerald-400' };
+    case 'DAILY_AID':
+      return { label: 'FAUCET HARIAN', color: 'bg-sky-500/20 text-sky-400' };
+    case 'WHALE_FAUCET':
+      return { label: 'WHALE VIP', color: 'bg-indigo-500/20 text-indigo-400' };
+    case 'MEME_BET':
+      return { label: 'MEME SNIPE', color: 'bg-orange-500/20 text-orange-400' };
+    case 'MEME_WIN':
+      return { label: 'MEME CUAN', color: 'bg-emerald-500/20 text-emerald-400' };
+    case 'EVENT_HACK':
+      return { label: 'HACKER DRAIN', color: 'bg-rose-600/30 text-rose-300' };
+    case 'EVENT_DEFENSE':
+      return { label: 'COLD WALLET', color: 'bg-cyan-500/20 text-cyan-400' };
+    default:
+      return { label: log.amount >= 0 ? 'PEMASUKAN' : 'PENGELUARAN', color: log.amount >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400' };
+  }
+};
+
+const renderLogIcon = (log) => {
+  const isPos = log.amount >= 0;
+  if (log.type === 'TRADE_LIQ') return <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />;
+  if (log.type === 'TRADE' || log.type === 'TRADE_SHIELD') {
+    return isPos ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> : <TrendingDown className="w-3.5 h-3.5 text-rose-400" />;
+  }
+  if (log.type === 'UPGRADE') return <Cpu className="w-3.5 h-3.5 text-blue-400" />;
+  if (log.type === 'BLACK_MARKET') return <ShoppingBag className="w-3.5 h-3.5 text-purple-400" />;
+  if (log.type === 'AD_CASH' || log.type === 'AD_BAILOUT' || log.type === 'OFFLINE_2X') {
+    return <Sparkles className="w-3.5 h-3.5 text-amber-400" />;
+  }
+  if (log.type === 'OFFLINE_PASSIVE') return <Bot className="w-3.5 h-3.5 text-emerald-400" />;
+  if (log.type === 'QUEST_MILESTONE' || log.type === 'QUEST_DAILY') return <Award className="w-3.5 h-3.5 text-yellow-400" />;
+  if (log.type === 'DAILY_AID' || log.type === 'WHALE_FAUCET') return <Coins className="w-3.5 h-3.5 text-sky-400" />;
+  if (log.type === 'EVENT_HACK') return <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />;
+  if (log.type === 'EVENT_DEFENSE') return <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />;
+  if (log.type === 'MEME_BET' || log.type === 'MEME_WIN') return <Flame className="w-3.5 h-3.5 text-orange-400" />;
+  return isPos ? <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDownRight className="w-3.5 h-3.5 text-rose-400" />;
 };
 
 const calculateEMA = (candles, period) => {
@@ -861,7 +923,7 @@ const finiteNonnegative = (n, fallback = 0) =>
 function loadGame() {
   const fresh = {
     cash: 10, peakNetWorth: 10, whaleTokens: 0, passiveLevels: emptyLevels(),
-    activePosition: null, tradeHistory: [], lastDailyClaim: 0,
+    activePosition: null, tradeHistory: [], cashLogs: [], lastDailyClaim: 0,
     lastWhaleFaucetClaim: 0,
     lastCashAdClaim: 0,
     selectedPairIdx: 0, selectedTfIdx: 0,
@@ -1018,7 +1080,22 @@ function loadGame() {
       offline: earned > 0 ? { seconds: Math.floor(seconds), earned } : null,
       claimedMilestones: validClaimedMilestones,
       questStats: validQuestStats,
-      dailyQuestState: validDaily
+      dailyQuestState: validDaily,
+      cashLogs: Array.isArray(saved.cashLogs)
+        ? saved.cashLogs
+            .filter(l => l && typeof l.title === 'string' && Number.isFinite(l.amount))
+            .slice(0, 50)
+        : (Array.isArray(saved.tradeHistory)
+            ? saved.tradeHistory.map(t => ({
+                id: `migrated-${t.id || makeId()}`,
+                time: t.id && t.id > 1000000000 ? t.id : Date.now(),
+                type: 'TRADE',
+                category: 'trade',
+                title: `${t.type} ${t.pair} (${t.leverage}x)`,
+                amount: t.pnl,
+                detail: t.status === 'LIQUIDATED' ? '💀 Terlikuidasi' : `ROI ${t.roi ? t.roi.toFixed(1) : '0'}%`
+              }))
+            : [])
     };
   } catch {
     return fresh;
@@ -1195,7 +1272,18 @@ function TradingGame() {
   const [lastDailyClaim, setLastDailyClaim] = useState(initial.lastDailyClaim);
   const [lastWhaleFaucetClaim, setLastWhaleFaucetClaim] = useState(initial.lastWhaleFaucetClaim || 0);
   const [lastCashAdClaim, setLastCashAdClaim] = useState(initial.lastCashAdClaim || 0);
+  const [cashLogs, setCashLogs] = useState(initial.cashLogs || []);
+  const [historyFilter, setHistoryFilter] = useState('all'); // 'all' | 'trade' | 'income' | 'expense'
   const [saveError, setSaveError] = useState(false);
+
+  const addCashLog = useCallback((entry) => {
+    const newLog = {
+      id: makeId(),
+      time: Date.now(),
+      ...entry
+    };
+    setCashLogs((prev) => [newLog, ...(prev || [])].slice(0, 50));
+  }, []);
 
   const [selectedPairIdx, setSelectedPairIdx] = useState(initial.selectedPairIdx);
   const [selectedTfIdx, setSelectedTfIdx] = useState(initial.selectedTfIdx);
@@ -2244,6 +2332,7 @@ function TradingGame() {
     setPassiveLevels(fresh.passiveLevels);
     setActivePosition(fresh.activePosition);
     setTradeHistory(fresh.tradeHistory);
+    setCashLogs(fresh.cashLogs || []);
     setLastDailyClaim(fresh.lastDailyClaim);
     setLastCashAdClaim(fresh.lastCashAdClaim || 0);
     setSelectedPairIdx(fresh.selectedPairIdx);
@@ -2525,6 +2614,13 @@ function TradingGame() {
 
     setCash((c) => c + quest.reward);
     setClaimedMilestones((prev) => ({ ...prev, [questId]: true }));
+    addCashLog({
+      type: 'QUEST_MILESTONE',
+      category: 'income',
+      title: `Hadiah Misi: ${quest.title}`,
+      amount: quest.reward,
+      detail: `Fase ${quest.phase}`
+    });
     playProfitSound();
     triggerToast(`Misi Selesai: "${quest.title}"! Hadiah +${formatMoney(quest.reward)} masuk kas!`, 'success');
   };
@@ -2536,6 +2632,13 @@ function TradingGame() {
     if (quest.getProgress(dailyQuestState) < quest.target) return;
 
     setCash((c) => c + quest.reward);
+    addCashLog({
+      type: 'QUEST_DAILY',
+      category: 'income',
+      title: `Hadiah Tugas: ${quest.title}`,
+      amount: quest.reward,
+      detail: 'Tugas Harian'
+    });
     playProfitSound();
     setDailyQuestState((prev) => ({
       ...prev,
@@ -2547,7 +2650,7 @@ function TradingGame() {
   useLayoutEffect(() => {
     latest.current = {
       cash, peakNetWorth: Math.max(peakNetWorth, netWorth), whaleTokens, passiveLevels,
-      activePosition, tradeHistory, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
+      activePosition, tradeHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
       inventory, activeEffects, dailyWhaleUsage
@@ -2575,6 +2678,7 @@ function TradingGame() {
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
         tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
       }));
       setSaveError(false);
@@ -2590,6 +2694,7 @@ function TradingGame() {
           syncVersion: 2,
           marketPrices: [...marketPricesRef.current],
           tradeHistory: (state.tradeHistory || []).slice(0, 10),
+          cashLogs: (state.cashLogs || []).slice(0, 30),
           lastTimestamp: Date.now()
         }));
         setSaveError(false);
@@ -2609,6 +2714,7 @@ function TradingGame() {
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
         tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
       };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -2726,6 +2832,7 @@ function TradingGame() {
         setPassiveLevels(fresh.passiveLevels);
         setActivePosition(fresh.activePosition);
         setTradeHistory(fresh.tradeHistory);
+        setCashLogs(fresh.cashLogs || []);
         setLastDailyClaim(fresh.lastDailyClaim);
         setLastCashAdClaim(fresh.lastCashAdClaim || 0);
         setSelectedPairIdx(fresh.selectedPairIdx);
@@ -3829,6 +3936,13 @@ function TradingGame() {
           },
           ...prev.slice(0, 19)
         ]);
+        addCashLog({
+          type: 'TRADE_SHIELD',
+          category: 'trade',
+          title: `Shield: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
+          amount: -lost,
+          detail: `85% Margin (${formatMoney(refund)}) Terselamatkan`
+        });
         setActivePosition(null);
         return;
       }
@@ -3853,6 +3967,13 @@ function TradingGame() {
         },
         ...prev.slice(0, 19)
       ]);
+      addCashLog({
+        type: 'TRADE_LIQ',
+        category: 'trade',
+        title: `💀 Likuidasi: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
+        amount: -lost,
+        detail: `Margin ${formatMoney(lost)} hangus`
+      });
       setActivePosition(null);
     } else if (isTpHit) {
       closePosition(true, 'TAKE PROFIT (TP)');
@@ -3927,6 +4048,13 @@ function TradingGame() {
       if (event.type === 'HACK') {
         const penalty = latest.current.cash * 0.25;
         setCash(c => Math.max(0, c * 0.75));
+        addCashLog({
+          type: 'EVENT_HACK',
+          category: 'expense',
+          title: '⚠️ Hacker Drain Kas',
+          amount: -penalty,
+          detail: '25% Saldo kas terkuras'
+        });
         setPassiveLevels(prev => {
           const copy = { ...prev };
           const highest = [...PASSIVE_UPGRADES].reverse().find(u => copy[u.id] > 0);
@@ -3994,6 +4122,13 @@ function TradingGame() {
     const cost = getUpgradeCost(item.baseCost, item.costScale, lvl);
     if (cash >= cost) {
       setCash((c) => c - cost);
+      addCashLog({
+        type: 'UPGRADE',
+        category: 'expense',
+        title: `Beli Rig: ${item.name}`,
+        amount: -cost,
+        detail: `Naik ke Level ${lvl + 1} (+${formatMoney(item.baseDps * totalMultiplier)}/s)`
+      });
       playUpgradeSound();
       setPassiveLevels((prev) => ({ ...prev, [item.id]: lvl + 1 }));
       setDailyQuestState((prev) => ({
@@ -4098,6 +4233,13 @@ function TradingGame() {
       return;
     }
     setCash((c) => c - item.cost);
+    addCashLog({
+      type: 'BLACK_MARKET',
+      category: 'expense',
+      title: `Beli Item: ${t[item.nameKey] || item.defaultName}`,
+      amount: -item.cost,
+      detail: 'Power-Up Pasar Gelap'
+    });
     setInventory((prev) => ({
       ...prev,
       [item.id]: (prev[item.id] || 0) + 1
@@ -4233,11 +4375,25 @@ function TradingGame() {
   // --- Meme Launchpad Handlers ---
   const handleMemePlaceBet = (amount) => {
     setCash((c) => Math.max(0, c - amount));
+    addCashLog({
+      type: 'MEME_BET',
+      category: 'expense',
+      title: 'Snipe Meme Coin Launchpad',
+      amount: -amount,
+      detail: 'Modal Pembelian Awal'
+    });
   };
 
   const handleMemeWinCash = (winAmount) => {
     setCash((c) => c + winAmount);
     setPeakNetWorth((prev) => Math.max(prev, cash + winAmount));
+    addCashLog({
+      type: 'MEME_WIN',
+      category: 'income',
+      title: 'Take Profit Meme Coin Pump',
+      amount: winAmount,
+      detail: 'Cuan Launchpad'
+    });
   };
 
   const closePosition = (isAuto = false, customReason = '') => {
@@ -4282,6 +4438,14 @@ function TradingGame() {
     const netPnl = pnlAmount - closingTax;
     const isWin = netPnl > 0;
     const isHighLev = activePosition.leverage >= 50;
+
+    addCashLog({
+      type: 'TRADE',
+      category: 'trade',
+      title: `${netPnl >= 0 ? 'Profit Trade' : 'Cut Loss'}: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
+      amount: netPnl,
+      detail: `${isAuto ? customReason : 'Close Manual'} • ROI ${roiPercent.toFixed(1)}%`
+    });
 
     setQuestStats((prev) => ({
       ...prev,
@@ -4472,6 +4636,7 @@ function TradingGame() {
       passiveLevels: cleanLevels,
       activePosition: null,
       tradeHistory: [],
+      cashLogs: [],
       lastDailyClaim: 0,
       lastCashAdClaim: 0,
       selectedPairIdx: 0,
@@ -4512,6 +4677,8 @@ function TradingGame() {
     setPeakNetWorth(10.0);
     setWhaleTokens(0);
     setActivePosition(null);
+    setTradeHistory([]);
+    setCashLogs([]);
     setLastDailyClaim(0);
     setLastCashAdClaim(0);
     setBullRunLeft(0);
@@ -6270,8 +6437,8 @@ function TradingGame() {
                       : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
                   }`}
                 >
-                  <Activity className="w-3.5 h-3.5 text-slate-300" />
-                  <span>{t.tabHistory || 'Log Trade'}</span>
+                  <Receipt className="w-3.5 h-3.5 text-slate-300" />
+                  <span>{t.tabHistory || 'Log Mutasi & Trade'}</span>
                 </button>
               </div>
 
@@ -6615,48 +6782,110 @@ function TradingGame() {
               </div>
             )}
 
-            {activeTab === 'history' && (
-              <div className="space-y-2">
-                {tradeHistory.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500 text-xs">
-                    {t.noTradeHistory || 'Belum ada riwayat posisi Leverage Trading.'}
+            {activeTab === 'history' && (() => {
+              const totalInflow = (cashLogs || []).reduce((acc, l) => (l.amount > 0 ? acc + l.amount : acc), 0);
+              const totalOutflow = (cashLogs || []).reduce((acc, l) => (l.amount < 0 ? acc + Math.abs(l.amount) : acc), 0);
+              const netFlow = totalInflow - totalOutflow;
+              const filteredLogs = (cashLogs || []).filter((l) => {
+                if (historyFilter === 'trade') return l.type === 'TRADE' || l.type === 'TRADE_LIQ' || l.type === 'TRADE_SHIELD' || l.category === 'trade';
+                if (historyFilter === 'income') return l.amount > 0;
+                if (historyFilter === 'expense') return l.amount < 0;
+                return true;
+              });
+
+              return (
+                <div className="space-y-2.5">
+                  {/* Financial Ledger Summary Cards */}
+                  <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-[#090D15] border border-slate-800 text-[10px] font-mono">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
+                      <div className="text-slate-400 text-[9px] uppercase font-bold">Total Masuk</div>
+                      <div className="font-extrabold text-emerald-400 truncate">+{formatMoney(totalInflow)}</div>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-center">
+                      <div className="text-slate-400 text-[9px] uppercase font-bold">Total Keluar</div>
+                      <div className="font-extrabold text-rose-400 truncate">-{formatMoney(totalOutflow)}</div>
+                    </div>
+                    <div className={`p-1.5 rounded-lg border text-center ${netFlow >= 0 ? 'bg-sky-500/10 border-sky-500/20 text-sky-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'}`}>
+                      <div className="text-slate-400 text-[9px] uppercase font-bold">Net Flow</div>
+                      <div className="font-extrabold truncate">{netFlow >= 0 ? '+' : ''}{formatMoney(netFlow)}</div>
+                    </div>
                   </div>
-                ) : (
-                  tradeHistory.map((t) => (
-                    <div
-                      key={t.id}
-                      className="p-2.5 rounded-xl bg-[#111622] border border-slate-800 flex items-center justify-between text-xs font-mono"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            t.type === 'LONG'
-                              ? 'bg-[#00FF88]/20 text-[#00FF88]'
-                              : 'bg-[#FF3366]/20 text-[#FF3366]'
-                          }`}
-                        >
-                          {t.type} {t.leverage}x
-                        </span>
-                        <span className="text-white font-bold">{t.pair}</span>
-                        {t.status === 'LIQUIDATED' && (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 text-[10px]">
-                            💀 LIQUIDATED
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className={`font-bold ${
-                          t.pnl >= 0 ? 'text-[#00FF88]' : 'text-[#FF3366]'
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-bold">
+                    {[
+                      { id: 'all', label: 'Semua Mutasi' },
+                      { id: 'trade', label: 'Trade' },
+                      { id: 'income', label: 'Pemasukan (+)' },
+                      { id: 'expense', label: 'Pengeluaran (-)' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setHistoryFilter(f.id)}
+                        className={`px-2.5 py-1 rounded-lg transition-all shrink-0 cursor-pointer text-xs ${
+                          historyFilter === f.id
+                            ? 'bg-slate-700 text-white shadow-sm font-bold border border-slate-600'
+                            : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent'
                         }`}
                       >
-                        {t.pnl >= 0 ? '+' : ''}
-                        {formatMoney(t.pnl)} ({t.roi.toFixed(1)}%)
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Log List */}
+                  <div className="space-y-1.5 max-h-[380px] sm:max-h-[440px] overflow-y-auto pr-1">
+                    {filteredLogs.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 text-xs">
+                        Belum ada catatan mutasi kas atau trade untuk kategori ini.
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                    ) : (
+                      filteredLogs.map((log) => {
+                        const isPositive = log.amount >= 0;
+                        const badge = getLogBadge(log);
+                        const timeStr = log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                        return (
+                          <div
+                            key={log.id}
+                            className="p-2.5 rounded-xl bg-[#111622] hover:bg-[#161d2d] border border-slate-800 transition-colors flex items-center justify-between text-xs font-mono gap-2"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                isPositive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                              }`}>
+                                {renderLogIcon(log)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-white font-bold text-xs truncate max-w-[150px] sm:max-w-[200px]">
+                                    {log.title}
+                                  </span>
+                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${badge.color}`}>
+                                    {badge.label}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                                  {log.detail && <span>{log.detail}</span>}
+                                  {log.detail && timeStr && <span>•</span>}
+                                  {timeStr && <span className="text-slate-500">{timeStr}</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className={`text-right shrink-0 font-extrabold text-xs ${
+                              isPositive ? 'text-[#00FF88]' : 'text-[#FF3366]'
+                            }`}>
+                              {isPositive ? '+' : '-'}{formatMoney(Math.abs(log.amount))}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         )}
@@ -7036,7 +7265,16 @@ function TradingGame() {
 
               <button
                 type="button"
-                onClick={() => setOfflineModal(null)}
+                onClick={() => {
+                  addCashLog({
+                    type: 'OFFLINE_PASSIVE',
+                    category: 'income',
+                    title: 'Hasil Cuan Bot & Kru Offline',
+                    amount: offlineModal.earned,
+                    detail: `${offlineModal.seconds}s offline`
+                  });
+                  setOfflineModal(null);
+                }}
                 className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-bold text-xs cursor-pointer transition-colors border border-slate-700/50"
               >
                 {t.offlineClaimBtn || 'Sudah masuk kas, lanjut'}
@@ -7468,6 +7706,13 @@ function TradingGame() {
           if (adRewardType === 'cash_reward') {
             setLastCashAdClaim(Date.now());
             setCash((prev) => prev + 5);
+            addCashLog({
+              type: 'AD_CASH',
+              category: 'income',
+              title: 'Klaim Iklan Sponsor (Modal Kas)',
+              amount: 5.0,
+              detail: 'Sponsor Resmi'
+            });
             playProfitSound();
             triggerToast('🎉 +$5.00 Cash berhasil ditambahkan ke saldo modal trading Anda!', 'success');
             return;
@@ -7475,6 +7720,20 @@ function TradingGame() {
           if (adRewardType === 'offline_doubler') {
             const extraEarned = offlineModal?.earned || 5;
             setCash((prev) => prev + extraEarned);
+            addCashLog({
+              type: 'OFFLINE_PASSIVE',
+              category: 'income',
+              title: 'Hasil Cuan Bot & Kru Offline',
+              amount: extraEarned,
+              detail: `${offlineModal?.seconds || 0}s offline`
+            });
+            addCashLog({
+              type: 'OFFLINE_2X',
+              category: 'income',
+              title: '⚡ Gandakan Cuan Offline 2x (Sponsor)',
+              amount: extraEarned,
+              detail: 'Bonus 2x lipat pendapatan offline'
+            });
             setOfflineModal(null);
             playProfitSound();
             triggerToast(`🎉 Cuan Pasif Offline Berhasil Digandakan 2x! +${formatMoney(extraEarned)} bonus masuk kas!`, 'success');
@@ -7483,6 +7742,13 @@ function TradingGame() {
           if (!liquidationAlert) return;
           const recovery = Math.max(5, liquidationAlert.lostAmount * 0.2);
           setCash((c) => c + recovery);
+          addCashLog({
+            type: 'AD_BAILOUT',
+            category: 'income',
+            title: 'Dana Talangan Likuidasi (Sponsor)',
+            amount: recovery,
+            detail: `20% recovery posisi ${liquidationAlert.pair}`
+          });
           setLiquidationAlert(null);
           triggerToast(`Dana Talangan Cair 20%! +${formatMoney(recovery)} masuk ke kas.`, 'success');
         }}
