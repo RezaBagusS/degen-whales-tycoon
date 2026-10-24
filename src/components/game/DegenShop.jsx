@@ -35,6 +35,8 @@ export const DegenShop = ({
   activeEffects = {},
   onBuyBlackMarketItem,
   onOpenRewardedAd,
+  isCashAdCoolingDown = false,
+  cashAdRemainingSec = 0,
   t = {},
   language = 'id',
   formatMoney,
@@ -179,11 +181,25 @@ export const DegenShop = ({
             </div>
             <button
               type="button"
+              disabled={isCashAdCoolingDown}
               onClick={onOpenRewardedAd}
-              className="w-full sm:w-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              className={
+                isCashAdCoolingDown
+                  ? "w-full sm:w-auto px-4 py-2 rounded-lg bg-slate-800/80 border border-slate-700/80 text-slate-400 font-bold font-mono text-xs flex items-center justify-center gap-1.5 cursor-not-allowed select-none shrink-0"
+                  : "w-full sm:w-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              }
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Tonton Iklan (+$5 Cash)</span>
+              {isCashAdCoolingDown ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span>Cooldown ({Math.floor(cashAdRemainingSec / 60)}:{String(cashAdRemainingSec % 60).padStart(2, '0')})</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Tonton Iklan (+$5 Cash)</span>
+                </>
+              )}
             </button>
           </div>
         )}

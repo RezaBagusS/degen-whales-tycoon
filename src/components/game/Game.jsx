@@ -848,6 +848,7 @@ const SAVE_KEY = 'degen_whale_save_v8';
 const LEGACY_SAVE_KEY = 'degen_whale_save_v7';
 const TAB_SYNC_CHANNEL = 'degen_whale_tab_sync';
 const MAX_OFFLINE_SECONDS = 8 * 60 * 60;
+const CASH_AD_COOLDOWN_MS = 180 * 1000; // 3 menit cooldown perlindungan Monetag & game loop
 let localIdSequence = 0;
 // IDs need uniqueness within this simulation, not a secure-context-only API.
 const makeId = () => `game-${Date.now().toString(36)}-${(++localIdSequence).toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -862,6 +863,7 @@ function loadGame() {
     cash: 10, peakNetWorth: 10, whaleTokens: 0, passiveLevels: emptyLevels(),
     activePosition: null, tradeHistory: [], lastDailyClaim: 0,
     lastWhaleFaucetClaim: 0,
+    lastCashAdClaim: 0,
     selectedPairIdx: 0, selectedTfIdx: 0,
     marketPrices: MARKET_PAIRS.map(p => p.basePrice),
     bullRunLeft: 0, bearMarketLeft: 0, activeEvent: null,
@@ -990,6 +992,7 @@ function loadGame() {
       peakNetWorth: peak, whaleTokens: tokens, passiveLevels: levels,
       lastDailyClaim: Math.min(Date.now(), finiteNonnegative(saved.lastDailyClaim)),
       lastWhaleFaucetClaim: finiteNonnegative(saved.lastWhaleFaucetClaim, 0),
+      lastCashAdClaim: finiteNonnegative(saved.lastCashAdClaim, 0),
       tradeHistory: Array.isArray(saved.tradeHistory) ? saved.tradeHistory
         .filter(t => t && typeof t.pair === 'string' && Number.isFinite(t.pnl)
           && Number.isFinite(t.roi)).slice(0, 20) : [],
@@ -1191,6 +1194,7 @@ function TradingGame() {
   const [offlineModal, setOfflineModal] = useState(initial.offline);
   const [lastDailyClaim, setLastDailyClaim] = useState(initial.lastDailyClaim);
   const [lastWhaleFaucetClaim, setLastWhaleFaucetClaim] = useState(initial.lastWhaleFaucetClaim || 0);
+  const [lastCashAdClaim, setLastCashAdClaim] = useState(initial.lastCashAdClaim || 0);
   const [saveError, setSaveError] = useState(false);
 
   const [selectedPairIdx, setSelectedPairIdx] = useState(initial.selectedPairIdx);
@@ -2241,6 +2245,7 @@ function TradingGame() {
     setActivePosition(fresh.activePosition);
     setTradeHistory(fresh.tradeHistory);
     setLastDailyClaim(fresh.lastDailyClaim);
+    setLastCashAdClaim(fresh.lastCashAdClaim || 0);
     setSelectedPairIdx(fresh.selectedPairIdx);
     setSelectedTfIdx(fresh.selectedTfIdx);
     setBullRunLeft(fresh.bullRunLeft);
@@ -2394,6 +2399,10 @@ function TradingGame() {
     return (Date.now() - lastDailyClaim) < cooldownMs;
   }, [lastDailyClaim]);
 
+  // 3-Minute Cooldown logic for $5 Cash Ad Button (re-evaluates with candleTick)
+  const isCashAdCoolingDown = Date.now() - (lastCashAdClaim || 0) < CASH_AD_COOLDOWN_MS;
+  const cashAdRemainingSec = Math.max(0, Math.ceil((CASH_AD_COOLDOWN_MS - (Date.now() - (lastCashAdClaim || 0))) / 1000));
+
   const prestigeMultiplier = useMemo(() => {
     return 1 + whaleTokens * 0.5;
   }, [whaleTokens]);
@@ -2538,7 +2547,7 @@ function TradingGame() {
   useLayoutEffect(() => {
     latest.current = {
       cash, peakNetWorth: Math.max(peakNetWorth, netWorth), whaleTokens, passiveLevels,
-      activePosition, tradeHistory, lastDailyClaim, lastWhaleFaucetClaim, selectedPairIdx, selectedTfIdx,
+      activePosition, tradeHistory, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
       inventory, activeEffects, dailyWhaleUsage
@@ -2718,6 +2727,7 @@ function TradingGame() {
         setActivePosition(fresh.activePosition);
         setTradeHistory(fresh.tradeHistory);
         setLastDailyClaim(fresh.lastDailyClaim);
+        setLastCashAdClaim(fresh.lastCashAdClaim || 0);
         setSelectedPairIdx(fresh.selectedPairIdx);
         setSelectedTfIdx(fresh.selectedTfIdx);
         setBullRunLeft(fresh.bullRunLeft);
@@ -4463,6 +4473,7 @@ function TradingGame() {
       activePosition: null,
       tradeHistory: [],
       lastDailyClaim: 0,
+      lastCashAdClaim: 0,
       selectedPairIdx: 0,
       selectedTfIdx: 0,
       bullRunLeft: 0,
@@ -4502,6 +4513,7 @@ function TradingGame() {
     setWhaleTokens(0);
     setActivePosition(null);
     setLastDailyClaim(0);
+    setLastCashAdClaim(0);
     setBullRunLeft(0);
     setBearMarketLeft(0);
     setActiveEvent(null);
@@ -4580,18 +4592,33 @@ function TradingGame() {
               )}
             </button>
 
-            {/* Free $5 Cash Rewarded Ad Button */}
+            {/* Free $5 Cash Rewarded Ad Button with 3-Minute Cooldown */}
             <button
+              disabled={isCashAdCoolingDown}
               onClick={() => {
+                if (isCashAdCoolingDown) return;
                 setAdRewardType('cash_reward');
                 setShowRewardedAdModal(true);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/15 hover:from-emerald-500/30 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
-              title="Tonton Iklan (+$5.00 Modal Kas Gratis)"
+              className={
+                isCashAdCoolingDown
+                  ? "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-800/80 border border-slate-700/80 text-slate-400 cursor-not-allowed select-none"
+                  : "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/15 hover:from-emerald-500/30 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              }
+              title={isCashAdCoolingDown ? `Cooldown: Tunggu ${cashAdRemainingSec}s lagi` : "Tonton Iklan (+$5.00 Modal Kas Gratis)"}
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="hidden sm:inline">Gratis:</span>
-              <span className="font-mono text-emerald-200 font-bold">+$5 Cash</span>
+              {isCashAdCoolingDown ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span className="text-slate-300 font-mono font-bold">{formatCountdown(cashAdRemainingSec)}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  <span className="hidden sm:inline">Gratis:</span>
+                  <span className="font-mono text-emerald-200 font-bold">+$5 Cash</span>
+                </>
+              )}
             </button>
 
             <button
@@ -6671,9 +6698,12 @@ function TradingGame() {
             activeEffects={activeEffects}
             onBuyBlackMarketItem={handleBuyBlackMarketItem}
             onOpenRewardedAd={() => {
+              if (isCashAdCoolingDown) return;
               setAdRewardType('cash_reward');
               setShowRewardedAdModal(true);
             }}
+            isCashAdCoolingDown={isCashAdCoolingDown}
+            cashAdRemainingSec={cashAdRemainingSec}
             t={t}
             language={language}
             formatMoney={formatMoney}
@@ -6978,21 +7008,40 @@ function TradingGame() {
 
       {offlineModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111622] border border-[#00FF88]/50 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
-            <Bot className="w-12 h-12 text-[#00FF88] mx-auto mb-2" />
-            <h2 className="text-lg font-extrabold text-white">{t.offlineTitle || 'Bot & Kru Tetap Bekerja!'}</h2>
-            <p className="text-xs text-slate-400 mt-1">
-              {(t.offlineDesc ? t.offlineDesc.replace('{seconds}', offlineModal.seconds) : `Selama kamu pergi (${offlineModal.seconds} detik, maksimal 8 jam), sistem menghasilkan:`)}
-            </p>
-            <div className="text-2xl font-mono font-extrabold text-[#00FF88] my-4">
+          <div className="bg-[#111622] border border-[#00FF88]/50 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4">
+            <Bot className="w-12 h-12 text-[#00FF88] mx-auto" />
+            <div>
+              <h2 className="text-lg font-extrabold text-white">{t.offlineTitle || 'Bot & Kru Tetap Bekerja!'}</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {(t.offlineDesc ? t.offlineDesc.replace('{seconds}', offlineModal.seconds) : `Selama kamu pergi (${offlineModal.seconds} detik, maksimal 8 jam), sistem menghasilkan:`)}
+              </p>
+            </div>
+            <div className="text-2xl font-mono font-extrabold text-[#00FF88] py-2 px-3 rounded-xl bg-[#0B0E14] border border-emerald-500/30">
               +{formatMoney(offlineModal.earned)}
             </div>
-            <button
-              onClick={() => setOfflineModal(null)}
-              className="w-full py-2.5 rounded-xl bg-[#00FF88] text-slate-950 font-extrabold text-xs cursor-pointer"
-            >
-              {t.offlineClaimBtn || 'Sudah masuk kas, lanjut'}
-            </button>
+
+            {/* Action Buttons: 2x Doubler Ad vs Standard Claim */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdRewardType('offline_doubler');
+                  setShowRewardedAdModal(true);
+                }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-slate-950 fill-current" />
+                <span>⚡ Gandakan 2x (+{formatMoney(offlineModal.earned)})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOfflineModal(null)}
+                className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-bold text-xs cursor-pointer transition-colors border border-slate-700/50"
+              >
+                {t.offlineClaimBtn || 'Sudah masuk kas, lanjut'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -7401,13 +7450,34 @@ function TradingGame() {
       <RewardedAdModal
         isOpen={showRewardedAdModal}
         onClose={() => setShowRewardedAdModal(false)}
-        rewardTitle={adRewardType === 'cash_reward' ? 'Modal Kas Gratis $5' : 'Dana Talangan 20%'}
-        rewardAmountFormatted={adRewardType === 'cash_reward' ? '$5.00 Cash' : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))}
+        rewardTitle={
+          adRewardType === 'cash_reward'
+            ? 'Modal Kas Gratis $5'
+            : adRewardType === 'offline_doubler'
+              ? 'Bonus Gandakan Cuan Offline 2x'
+              : 'Dana Talangan 20%'
+        }
+        rewardAmountFormatted={
+          adRewardType === 'cash_reward'
+            ? '$5.00 Cash'
+            : adRewardType === 'offline_doubler'
+              ? `+${formatMoney(offlineModal?.earned || 5)} Cash`
+              : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))
+        }
         onRewardComplete={() => {
           if (adRewardType === 'cash_reward') {
+            setLastCashAdClaim(Date.now());
             setCash((prev) => prev + 5);
             playProfitSound();
             triggerToast('🎉 +$5.00 Cash berhasil ditambahkan ke saldo modal trading Anda!', 'success');
+            return;
+          }
+          if (adRewardType === 'offline_doubler') {
+            const extraEarned = offlineModal?.earned || 5;
+            setCash((prev) => prev + extraEarned);
+            setOfflineModal(null);
+            playProfitSound();
+            triggerToast(`🎉 Cuan Pasif Offline Berhasil Digandakan 2x! +${formatMoney(extraEarned)} bonus masuk kas!`, 'success');
             return;
           }
           if (!liquidationAlert) return;

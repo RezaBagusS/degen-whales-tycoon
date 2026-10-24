@@ -447,9 +447,12 @@ export default function PnlShareModal({
     const dateStr = now.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     ctx.fillText(`⚡ PROVABLY FAIR SIMULATOR  |  ${dateStr}`, 60, footerY + 42);
 
-    ctx.fillStyle = '#38BDF8';
-    ctx.font = '800 14px "JetBrains Mono", monospace';
-    ctx.fillText('PLAY DEGEN & WHALE NOW', width - 290, footerY + 42);
+    // Official Web URL Watermark for Viral Traffic
+    ctx.fillStyle = '#00FF88';
+    ctx.font = '800 15px "JetBrains Mono", monospace';
+    const watermarkText = '🌐 degen-whales-tycoon.vercel.app';
+    const watermarkWidth = ctx.measureText(watermarkText).width;
+    ctx.fillText(watermarkText, width - 60 - watermarkWidth, footerY + 42);
 
   }, [isOpen, activeTab, netWorth, cash, currentDps, tradeData, currentLocation, isProfitable, portfolioRoi, tradeRoi, tradePnlDollar, language, t]);
 
@@ -475,8 +478,8 @@ export default function PnlShareModal({
       : getTradePerformanceBadge(tradeRoi, language);
 
     const shareText = activeTab === 'portfolio'
-      ? `🐋 [DEGEN & WHALE] All-Time Portfolio ROI: ${portfolioRoi >= 0 ? '+' : ''}${portfolioRoi.toFixed(2)}% | Net Worth: ${formatMoney(netWorth)} | Rank: ${badgeData.icon} ${badgeData.label}!`
-      : `⚡ [DEGEN & WHALE] Trade PnL: ${tradeRoi >= 0 ? '+' : ''}${tradeRoi.toFixed(2)}% (${formatMoney(tradePnlDollar)}) on ${tradeData?.pairSymbol || 'BTC/USD'} | Rank: ${badgeData.icon} ${badgeData.label}!`;
+      ? `🐋 [DEGEN & WHALE] All-Time Portfolio ROI: ${portfolioRoi >= 0 ? '+' : ''}${portfolioRoi.toFixed(2)}% | Net Worth: ${formatMoney(netWorth)} | Rank: ${badgeData.icon} ${badgeData.label}!\n🎮 Mainkan gratis di: https://degen-whales-tycoon.vercel.app`
+      : `⚡ [DEGEN & WHALE] Trade PnL: ${tradeRoi >= 0 ? '+' : ''}${tradeRoi.toFixed(2)}% (${formatMoney(tradePnlDollar)}) on ${tradeData?.pairSymbol || 'BTC/USD'} | Rank: ${badgeData.icon} ${badgeData.label}!\n🎮 Mainkan gratis di: https://degen-whales-tycoon.vercel.app`;
 
     try {
       if (navigator.clipboard && typeof window !== 'undefined' && window.ClipboardItem) {
