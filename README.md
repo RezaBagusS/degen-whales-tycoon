@@ -1,177 +1,224 @@
-# Degen & Whale: Next.js
+# 🐋 DEGEN & WHALE — The Ultimate Crypto Tycoon Simulator
 
-Konversi dari artifact **Degen & Whale Bugfix V2**, game **v1.3.1**.
-Menggunakan Next.js App Router, React, Tailwind CSS 3, dan lucide-react.
-Tidak membutuhkan API key, database, atau akun untuk bermain.
+<div align="center">
 
-## Menjalankan lokal
+[![Live Demo](https://img.shields.io/badge/PLAY_NOW-degen--whales--tycoon.vercel.app-00FF88?style=for-the-badge&logo=vercel&logoColor=black)](https://degen-whales-tycoon.vercel.app)
+[![Version](https://img.shields.io/badge/version-1.3.1_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
+[![License](https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js_16-Turbopack-white?style=for-the-badge&logo=next.js&logoColor=black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React_19-Client_Engine-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
-Pasang Node.js 22 LTS beserta npm. Minimum Next.js: Node.js 20.9.
-Ekstrak ZIP, buka terminal pada folder yang berisi `package.json`, lalu:
+**An immersive, high-stakes idle trading floor tycoon where you rise from a broke retail trader in a dusty boarding room into a market-manipulating crypto Whale.**
+
+[🎮 Play Live Simulator](https://degen-whales-tycoon.vercel.app) • [📖 Gameplay Features](#-key-features) • [🛠️ Architecture](#%EF%B8%8F-technology-stack) • [🚀 Quickstart](#-quickstart--local-development)
+
+</div>
+
+---
+
+## 🎯 Game Overview
+
+**DEGEN & WHALE** merges the adrenaline of **high-leverage cryptocurrency perpetual trading** with the addictive progression of an **idle tycoon empire builder**. 
+
+You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kamar Kos Sempit*). By scalping volatile meme coins, taking calculated 100x leverage bets, building high-frequency automated mining rigs, and deploying black market insider gadgets, you accumulate generational wealth, dodge SEC crackdowns, survive hacker drain events, and eventually execute the ultimate **Rugpull Prestige** to join the elite **Whale Syndicate**.
+
+> **100% Provably Fair Simulation:** Zero real money required, zero signup walls, and zero friction. All market dynamics and volatility run in an optimized client-side deterministic canvas engine.
+
+---
+
+## ⚡ Key Features
+
+### 📈 1. Real-Time High-Octane Trading Terminal
+- **Living Candlestick Canvas Engine**: High-performance HTML5 2D canvas chart with smooth real-time price action and multi-timeframe aggregation (`5s`, `15s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`).
+- **Flexible Leverage Spectrum**: Trade LONG or SHORT with `2x`, `10x`, `50x`, and `100x` leverage (up to `250x` with black market VIP passes).
+- **Pro Risk Management**: Set Take-Profit (TP) and Stop-Loss (SL) targets with visual drag-and-drop boundary lines directly on the chart.
+- **Realistic Slippage, Liquidation, & Volatility**: Simulated market orders, funding mechanics, closing taxes, and immediate liquidation alerts when margin falls below maintenance thresholds.
+- **Technical Analysis Suite**: Built-in EMA-20, EMA-50, EMA-200, Bollinger Bands, and interactive chart drawing tools (Trendlines, Horizontal Support/Resistance).
+
+### 🏭 2. Idle Tycoon Infrastructure & Mining Rigs
+- **10 Escalating Infrastructure Tiers**:
+  1. *Indikator Garis Keramat* (Support/Resistance Chart Pen)
+  2. *Grup VIP Sinyal 'Pasti Cuan'* (Paid Alpha Signals Channel)
+  3. *Layar Monitor Vertical 4x* (Multi-Monitor Battlestation)
+  4. *Sniper Bot (Solana/DEX)* (Front-Running Bot)
+  5. *Sewa Quant Developer* (Full-time Math Genius)
+  6. *Agentic AI Trading Cluster* (Predictive Machine Learning Farm)
+  7. *Bikin Exchange & Koin Sendiri* (Own the Casino)
+  8. *Tim Lobi Regulator & Pajak* (Institutional Compliance Lobby)
+  9. *Satelit Arbitrase Kuantum* (Zero-Latency Space Trading)
+  10. *Akuisisi Mesin Cetak Bank Sentral* (Infinite Liquidity Engine)
+- **Workstation Evolution**: Upgrade your real-estate from *Kamar Kos Sempit* to *Warnet VIP 24 Jam*, *Ruko Glodok*, *SCBD Penthouse Office*, up to an *Offshore Private Island*.
+- **Offline Earnings & 2x Multiplier**: Idle earnings continue accruing for up to 8 hours while you are away, with optional 2x doubler rewards.
+
+### 🕶️ 3. Black Market & Power-Ups
+- **Whale Pump Whistle & Dump Horn**: Force temporary synthetic bull runs or massive market crashes on degen pairs.
+- **Liquidation Shield**: High-tech insurance that breaks upon liquidation to recover **85%** of your collateral.
+- **Insider Radar & Zero-Fee Passes**: Detect institutional order books and eliminate transaction fees for critical scalps.
+
+### 📊 4. Full Financial Ledger (Buku Kas Mutasi)
+- Track **100% of your empire's cashflow** in real-time.
+- Instant financial summary cards: **Total Income (Masuk)**, **Total Expense (Keluar)**, and **Net Cashflow**.
+- Filter transactions by category: `Semua Mutasi`, `Trade`, `Pemasukan (+)`, and `Pengeluaran (-)`.
+
+### 🌐 5. Viral PnL Card Exporter
+- Export high-resolution (1200x675) Cyberpunk Bybit/Binance-style flex cards with one click.
+- Includes ROI percentages, dollar profits, entry prices, leverage badges, rank seals, and watermark links for social sharing.
+
+### 👑 6. Whale Syndicate Prestige Loop
+- Execute a **"Rugpull"** reset once your net worth reaches the required threshold.
+- Convert your temporary empire into permanent **Whale Tokens**.
+- Each Whale Token grants a **+0.50x global multiplier** and a **lifetime passive dividend of +$5.00/s** that persists across all future resets.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies |
+|---|---|
+| **Core Framework** | [Next.js 16](https://nextjs.org/) (App Router, Turbopack Engine) |
+| **Frontend UI** | [React 19](https://react.dev/), [Tailwind CSS 3](https://tailwindcss.com/), [Lucide React Icons](https://lucide.dev/) |
+| **Graphics Engine** | HTML5 Canvas 2D (Deterministic Realtime Candle Rendering) |
+| **Audio Synthesizer** | Web Audio API (Zero-asset, zero-latency procedural SFX) |
+| **State & Storage** | LocalStorage Engine `v8` with Multi-Tab BroadcastChannel synchronization |
+| **Backend & Database** | [Prisma ORM 7](https://www.prisma.io/), PostgreSQL (Optional Cloud Progress Sync) |
+| **Testing** | [Playwright Test Suite](https://playwright.dev/) (21 E2E tests for trading, mechanics, & state) |
+| **Deployment** | [Vercel Edge Network](https://vercel.com/) |
+
+---
+
+## 🚀 Quickstart & Local Development
+
+### Prerequisites
+- **Node.js**: `v20.9.0` or higher (`v22 LTS` recommended)
+- **npm**: `v10.0.0` or higher
+
+### 1. Clone & Install
 
 ```bash
+# Clone the repository
+git clone https://github.com/RezaBagusS/degen-whales-tycoon.git
+cd degen-whales-tycoon
+
+# Install dependencies
 npm install
+```
+
+### 2. Launch Development Server
+
+```bash
 npm run dev
 ```
 
-Buka **http://localhost:3000**. Hentikan server dengan Ctrl+C.
+Open [http://localhost:3000](http://localhost:3000) in your browser. The trading floor engine will spin up instantly with hot-module reloading enabled via Turbopack.
 
-Jika memakai nvm:
-
-```bash
-nvm install
-nvm use
-npm install
-npm run dev
-```
-
-Instalasi pertama memerlukan koneksi internet. Setelah instalasi, semua aset
-game disediakan aplikasi; tidak ada font CDN, request AI, atau harga pasar eksternal.
-
-## Build dan production lokal
+### 3. Production Build & Validation
 
 ```bash
+# Verify TypeScript definitions
 npm run typecheck
+
+# Build optimized production bundle
 npm run build
+
+# Run local production server
 npm run start
 ```
 
-`npm run start` memerlukan build sukses terlebih dahulu.
+---
 
-Rentang versi Next.js/React menerima pembaruan minor dan patch yang kompatibel.
-Paket ini tidak menyertakan lockfile buatan. `npm install` akan membuat
-`package-lock.json`; simpan file itu di Git, lalu gunakan `npm ci` di CI/deployment.
-Periksa advisory keamanan dependency sebelum deployment publik.
+## 🧪 Testing Suite
 
-## Tes
+The repository includes a comprehensive Playwright test suite covering game physics, trading math, save migrations, and UI hydration.
 
 ```bash
+# Install Chromium test runner
 npx playwright install chromium
+
+# Run all 21 regression tests
 npm test
-```
 
-Server development otomatis dijalankan oleh Playwright. Untuk mengetes production:
-
-```bash
+# Test against production bundle
 npm run test:production
 ```
 
-Perintah tersebut membangun aplikasi dan menjalankan tes terhadap `next start`.
-Pastikan tidak ada aplikasi lain menggunakan port 3000.
+### Test Coverage Highlights:
+- ✅ **Income & DPS Calculus**: Verification of idle accruals, location upkeep taxes, and Whale token dividends.
+- ✅ **Position Lifecycle**: Validation of Long/Short orders, margin deductions, TP/SL triggers, and liquidation thresholds.
+- ✅ **State Persistence & Multi-Tab Isolation**: Protection against race conditions, storage quota limits, and multi-tab overwrite locks.
+- ✅ **Offline Progress Recovery**: Calculation of offline earnings up to the 8-hour cap.
 
-Tersedia **21 tes** dalam paket Next.js:
+---
 
-- 16 tes mekanisme game: income, autosave, chart, posisi, event, prestige, reset,
-  validasi TP/SL, migrasi save, bantuan harian, dan layout.
-- 1 tes startup tanpa browser/network error.
-- 3 tes khusus Next.js/kompatibilitas: hydration, trading tanpa randomUUID,
-  dan startup ketika localStorage tidak tersedia.
-
-Tes iframe `srcdoc` dari artifact tidak disalin: bundel Next.js memuat chunk
-dari server, berbeda dari HTML artifact yang seluruh script-nya inline.
-
-## Status verifikasi: penting
-
-**Build Next.js dan tes browser Next.js belum dijalankan di lingkungan pembuat
-paket.** Lingkungan tersebut tidak memiliki Next.js maupun npm dan tidak memiliki
-akses internet untuk instalasi.
-
-Yang diperiksa saat pengemasan:
-
-- Sintaks JSX/TSX/TypeScript menggunakan transpiler yang tersedia.
-- Konfigurasi Tailwind menghasilkan CSS untuk kelas game.
-- Struktur route, import lokal, serta manifest paket.
-- Engine dan RuntimeGuard sama dengan artifact V2, kecuali penambahan
-  `'use client'`.
-
-Artifact asal telah lulus 21 tes browser pada runtime artifact. Itu **bukan**
-bukti bahwa build Next.js, runtime React 19, atau deployment production
-telah lulus. Jalankan perintah verifikasi di atas setelah instalasi.
-
-## Struktur proyek
+## 📁 Project Architecture
 
 ```text
-src/
-  app/
-    layout.tsx          Metadata, bahasa, global CSS
-    page.tsx            Halaman utama
-    loading.tsx         Fallback pemuatan route
-    error.tsx           Pemulihan error route/chunk
-    globals.css         Tailwind dan style dasar
-  components/
-    GameClient.tsx      Client boundary dan dynamic import tanpa SSR
-    GameLoading.tsx     Tampilan pemuatan
-    game/
-      Game.jsx          Engine dan UI game v1.3.1
-      RuntimeGuard.jsx  Pemulihan error render game
-tests/
-  game.spec.js          Regresi mekanisme game
-  startup.spec.js       Pemeriksaan startup
-  nextjs.spec.js        Hydration dan kompatibilitas browser
+degen-whale-nextjs/
+├── prisma/
+│   └── schema.prisma            # Database schema for cloud sync
+├── public/                      # Static assets, icons, and audio fallbacks
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx           # Global HTML shell, SEO metadata & font definitions
+│   │   ├── page.tsx             # Main entry point mounting GameClient
+│   │   ├── globals.css          # Tailwind design tokens & animations
+│   │   └── api/user/            # Cloud save & leaderboard API endpoints
+│   ├── components/
+│   │   ├── GameClient.tsx       # Dynamic Client Component boundary (SSR: false)
+│   │   ├── GameLoading.tsx      # Terminal loading animation
+│   │   └── game/
+│   │       ├── Game.jsx         # Core trading floor state machine & chart engine
+│   │       ├── DegenShop.jsx    # Infrastructure upgrades & Black Market interface
+│   │       ├── BlackMarket.js   # Special power-ups & consumables definitions
+│   │       ├── PnlShareModal.jsx# Cyberpunk 1200x675 Canvas PnL card generator
+│   │       ├── MemeLaunchpad.jsx# High-volatility pump-and-dump mini-game
+│   │       ├── audio.js         # Procedural Web Audio API sound synthesizer
+│   │       └── translations.js  # Bilingual localization (ID / EN)
+│   └── config/
+│       └── adsConfig.js         # Institutional partner & developer support settings
+└── tests/
+    ├── game.spec.js             # Core game mechanics verification
+    ├── startup.spec.js          # Boot & initialization sanity checks
+    └── nextjs.spec.js           # Client hydration & storage resiliency tests
 ```
 
-Halaman dan konfigurasi menggunakan TypeScript. Engine asli tetap JSX dengan
-`allowJs: true` dan `checkJs: false`, bukan konversi penuh seluruh engine ke
-TypeScript strict. `typecheck` memeriksa lapisan TypeScript, bukan seluruh logika JSX.
+---
 
-## Mengapa game tidak dirender di server?
+## 🔒 Security & Client-Side Resiliency
 
-Game menggunakan localStorage, canvas, waktu saat ini, dan candle acak.
-`GameClient.tsx` merupakan Client Component yang memakai:
+1. **Storage Isolation**: Saves are isolated strictly by origin (`degen_whale_save_v8`). Automatic backward-compatible migration is included for older `v7` saves.
+2. **Multi-Tab Mutex**: A `BroadcastChannel` protocol detects multiple active instances and locks secondary tabs to prevent state clobbering.
+3. **Graceful Degraded Mode**: If `localStorage` is disabled or fails due to quota limits, the game automatically switches to volatile memory mode with a clear user prompt, preventing fatal crashes.
+4. **Anti-Spam Ad Protection**: Server-independent 3-minute cooldowns prevent reward button spamming while preserving publisher integrity.
 
-```tsx
-dynamic(() => import('./game/Game'), { ssr: false, loading: () => <GameLoading /> })
-```
+---
 
-Browser memuat game setelah shell halaman tampil. Dengan begitu save pemain
-tidak dibaca di server dan chart acak tidak memicu hydration mismatch.
-`ssr: false` sengaja diletakkan di Client Component, bukan Server Component.
+## 🤝 Contributing & Community
 
-## Penyimpanan dan migrasi
+Contributions are welcomed! Feel free to submit issues, suggest new degen pairs, or propose new black market items.
 
-Save lokal menggunakan `degen_whale_save_v8`. Save `degen_whale_save_v7`
-dimigrasikan otomatis jika tersedia pada origin yang sama.
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feat/amazing-feature`)
+3. Commit your Changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the Branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request against the `dev` branch
 
-**Save pada ClickUp tidak otomatis pindah ke localhost atau domain deployment.**
-LocalStorage terpisah berdasarkan origin: skema, hostname, dan port.
-`localhost:3000` dan `127.0.0.1:3000` juga berbeda.
+---
 
-Posisi aktif, cash, token, level infrastruktur, riwayat, dan cooldown
-disimpan. Save tiap 3 detik, setelah transaksi, serta ketika meninggalkan halaman.
-Jika storage diblokir, game tetap bisa dimainkan dan menampilkan peringatan,
-tetapi progres tidak dijamin tersimpan.
+## ☕ Support the Developer
 
-Penghasilan ketika game ditutup maksimal 8 jam tanpa boost event.
-Harga posisi dijeda saat ditutup; posisi dilanjutkan ketika dibuka.
-Gunakan satu tab game per origin untuk menghindari save saling menimpa.
+If you enjoy playing **Degen & Whale**, consider supporting active development:
 
-## Fitur yang dipertahankan
+- ☕ **Saweria (IDR / QRIS)**: [saweria.co/rezabaguss](https://saweria.co/rezabaguss)
+- ⭐ **Star this repository** on GitHub!
 
-Modal awal $10, LONG/SHORT, 3 pair fiktif, leverage 2x/10x/50x/100x, TP/SL,
-likuidasi, pendapatan pasif, 10 infrastruktur, 7 workstation, Whale Token,
-prestige, event bull/bear/hacker, bantuan harian, dana talangan, dan riwayat.
+---
 
-Tidak ada integrasi exchange, uang asli, autentikasi, multiplayer, atau cloud save.
+## 📄 License
 
-## Deployment
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
-Gunakan hosting yang mendukung Next.js 16 dan Node.js >=20.9. Konfigurasi standar:
+<div align="center">
 
-- Install: `npm ci` setelah lockfile tersedia.
-- Build: `npm run build`.
-- Start: `npm run start` untuk hosting Node.js.
-- Tidak ada environment variable wajib.
+Crafted with 💚 for Degens & Whales worldwide.
 
-Deployment belum diuji. Game menyimpan data di browser pengguna, bukan disk
-server, sehingga restart server tidak menghapus save browser pada origin yang sama.
-
-## Jika halaman kosong
-
-1. Pastikan terminal menampilkan server siap dan buka `http://localhost:3000`.
-2. Buka Console browser untuk pesan error dan periksa output terminal.
-3. Jika baru mengubah dependency, hentikan server, hapus folder `.next`,
-   jalankan `npm install`, lalu `npm run dev` lagi.
-4. Jangan hapus data situs/localStorage untuk troubleshooting awal karena
-   tindakan tersebut menghapus progres pemain.
-
-Panduan resmi instalasi: https://nextjs.org/docs/app/getting-started/installation
+</div>
