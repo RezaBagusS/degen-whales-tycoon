@@ -160,30 +160,30 @@ export const DegenShop = ({
 
       {/* Main Tab Content */}
       <div className="p-4 flex-1 overflow-y-auto max-h-[620px] space-y-3">
-        {/* Rewarded Ad Free Whale Token Banner */}
+        {/* Rewarded Ad Free Cash Modal Banner */}
         {onOpenRewardedAd && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-sky-500/10 to-emerald-500/10 border border-purple-500/30">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-sky-500/10 border border-emerald-500/30">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
-                <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                <Coins className="w-4 h-4 text-emerald-400 animate-pulse" />
               </div>
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span>Klaim Whale Token Gratis</span>
-                  <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-mono font-bold">SPONSOR</span>
+                  <span>Klaim Modal Kas Gratis</span>
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold">SPONSOR</span>
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Tonton sponsor resmi untuk mendapatkan <strong>+5 Whale Token</strong> instan tanpa deposit.
+                  Tonton sponsor resmi untuk mendapatkan modal trading <strong>+$5.00 Cash</strong> instan.
                 </div>
               </div>
             </div>
             <button
               type="button"
               onClick={onOpenRewardedAd}
-              className="w-full sm:w-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              className="w-full sm:w-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Tonton Iklan (+5 Token)</span>
+              <span>Tonton Iklan (+$5 Cash)</span>
             </button>
           </div>
         )}

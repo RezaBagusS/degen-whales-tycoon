@@ -1221,7 +1221,7 @@ function TradingGame() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showWorkstationGallery, setShowWorkstationGallery] = useState(false);
   const [showRewardedAdModal, setShowRewardedAdModal] = useState(false);
-  const [adRewardType, setAdRewardType] = useState('liquidation_bailout'); // 'liquidation_bailout' | 'whale_token'
+  const [adRewardType, setAdRewardType] = useState('cash_reward'); // 'liquidation_bailout' | 'cash_reward'
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeTab, setActiveTab] = useState('quests');
@@ -4580,18 +4580,18 @@ function TradingGame() {
               )}
             </button>
 
-            {/* Free Whale Token Rewarded Ad Button */}
+            {/* Free $5 Cash Rewarded Ad Button */}
             <button
               onClick={() => {
-                setAdRewardType('whale_token');
+                setAdRewardType('cash_reward');
                 setShowRewardedAdModal(true);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500/20 to-sky-500/20 hover:from-purple-500/30 hover:to-sky-500/30 text-purple-300 border border-purple-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
-              title="Tonton Iklan (+5 Whale Token Gratis)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/15 hover:from-emerald-500/30 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Tonton Iklan (+$5.00 Modal Kas Gratis)"
             >
-              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
               <span className="hidden sm:inline">Gratis:</span>
-              <span className="font-mono text-purple-200">+5 Token</span>
+              <span className="font-mono text-emerald-200 font-bold">+$5 Cash</span>
             </button>
 
             <button
@@ -6671,7 +6671,7 @@ function TradingGame() {
             activeEffects={activeEffects}
             onBuyBlackMarketItem={handleBuyBlackMarketItem}
             onOpenRewardedAd={() => {
-              setAdRewardType('whale_token');
+              setAdRewardType('cash_reward');
               setShowRewardedAdModal(true);
             }}
             t={t}
@@ -7401,13 +7401,13 @@ function TradingGame() {
       <RewardedAdModal
         isOpen={showRewardedAdModal}
         onClose={() => setShowRewardedAdModal(false)}
-        rewardTitle={adRewardType === 'whale_token' ? '5 Whale Token Gratis' : 'Dana Talangan 20%'}
-        rewardAmountFormatted={adRewardType === 'whale_token' ? '5 Whale Tokens' : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))}
+        rewardTitle={adRewardType === 'cash_reward' ? 'Modal Kas Gratis $5' : 'Dana Talangan 20%'}
+        rewardAmountFormatted={adRewardType === 'cash_reward' ? '$5.00 Cash' : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))}
         onRewardComplete={() => {
-          if (adRewardType === 'whale_token') {
-            setWhaleTokens((prev) => prev + 5);
+          if (adRewardType === 'cash_reward') {
+            setCash((prev) => prev + 5);
             playProfitSound();
-            triggerToast('🎉 +5 Whale Token berhasil ditambahkan ke dompet Anda!', 'success');
+            triggerToast('🎉 +$5.00 Cash berhasil ditambahkan ke saldo modal trading Anda!', 'success');
             return;
           }
           if (!liquidationAlert) return;
