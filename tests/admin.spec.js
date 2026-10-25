@@ -172,9 +172,10 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     await expect(page.getByText('Admin Reset Password Pemain')).toBeVisible();
     await expect(page.getByPlaceholder(/Ketik password baru/i)).toBeVisible();
 
-    // Select "Suntik Kas & Whale Tokens (Kompensasi)"
+    // Select "Suntik Kas, Tokens & Item In-Game (Kompensasi)"
     await dropdown.selectOption('compensation');
-    await expect(page.getByText(/Suntik Kas & Tokens/i)).toBeVisible();
+    await expect(page.getByText('Suntik Kas, Tokens & Item In-Game (Kompensasi Support)')).toBeVisible();
+    await expect(page.getByText(/Suntik Item In-Game/i)).toBeVisible();
     await expect(page.getByPlaceholder('Contoh: 500')).toBeVisible();
 
     // Close modal

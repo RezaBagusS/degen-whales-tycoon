@@ -48,6 +48,15 @@ const LOCATION_NAMES = {
   7: 'Singularity Architect'
 };
 
+const GAME_ITEMS = [
+  { id: 'pump_whistle', name: 'Whale Pump Whistle', icon: '🎺', color: 'text-emerald-400' },
+  { id: 'dump_horn', name: 'Whale Dump Horn', icon: '📢', color: 'text-rose-400' },
+  { id: 'liq_shield', name: 'Liquidation Shield', icon: '🛡️', color: 'text-sky-400' },
+  { id: 'leverage_250x', name: 'God Leverage 250x Ticket', icon: '⚡', color: 'text-amber-400' },
+  { id: 'zero_fee', name: 'Zero-Fee VIP Pass', icon: '🎟️', color: 'text-purple-400' },
+  { id: 'insider_radar', name: 'Insider Alpha Radar', icon: '📡', color: 'text-pink-400' },
+];
+
 const formatMoney = (val) => {
   if (val === null || val === undefined || isNaN(val)) return '$0.00';
   const num = Number(val);
@@ -390,6 +399,8 @@ export default function AdminDashboard() {
   const [banReasonInput, setBanReasonInput] = useState('');
   const [compCash, setCompCash] = useState('');
   const [compTokens, setCompTokens] = useState('');
+  const [compItemId, setCompItemId] = useState('');
+  const [compItemQty, setCompItemQty] = useState('');
   const [compReason, setCompReason] = useState('');
   const [modActionLoading, setModActionLoading] = useState(false);
   const [modActionMsg, setModActionMsg] = useState(null);
@@ -688,8 +699,10 @@ export default function AdminDashboard() {
     if (!selectedPlayer) return;
     const cashVal = parseFloat(compCash || 0);
     const tokenVal = parseInt(compTokens || 0, 10);
-    if (!cashVal && !tokenVal) {
-      setModActionMsg({ type: 'error', text: 'Masukkan jumlah Kas ($) atau Whale Tokens yang ingin disuntikkan.' });
+    const itemQtyVal = parseInt(compItemQty || 0, 10);
+
+    if (!cashVal && !tokenVal && (!compItemId || !itemQtyVal)) {
+      setModActionMsg({ type: 'error', text: 'Masukkan jumlah Kas ($), Whale Tokens, atau Item yang ingin disuntikkan.' });
       return;
     }
     setModActionLoading(true);
@@ -703,6 +716,8 @@ export default function AdminDashboard() {
           userId: selectedPlayer.id,
           cashDelta: cashVal,
           whaleTokensDelta: tokenVal,
+          itemId: compItemId || undefined,
+          itemQty: itemQtyVal,
           reason: compReason || 'Kompensasi / Bantuan Support Admin'
         })
       });
@@ -714,10 +729,13 @@ export default function AdminDashboard() {
         setSelectedPlayer(prev => prev ? {
           ...prev,
           cash: resData.save?.cash ?? (prev.cash + cashVal),
-          whaleTokens: resData.save?.whaleTokens ?? (prev.whaleTokens + tokenVal)
+          whaleTokens: resData.save?.whaleTokens ?? (prev.whaleTokens + tokenVal),
+          inventory: resData.save?.inventory ?? prev.inventory
         } : null);
         setCompCash('');
         setCompTokens('');
+        setCompItemId('');
+        setCompItemQty('');
         setCompReason('');
         fetchMetrics(adminKey);
       }
@@ -1493,6 +1511,8 @@ export default function AdminDashboard() {
                                 setBanReasonInput(player.banReason || '');
                                 setCompCash('');
                                 setCompTokens('');
+                                setCompItemId('');
+                                setCompItemQty('');
                                 setCompReason('');
                               }}
                               className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
@@ -1588,20 +1608,22 @@ export default function AdminDashboard() {
 
                     {/* Inventaris Black Market */}
                     <div>
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-wider">Inventaris Black Market</h4>
-                      <div className="grid grid-cols-3 gap-2 text-[11px]">
-                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
-                          <span className="text-slate-400 text-[10px]">Pump Whistle:</span>
-                          <strong className="text-white text-xs">{selectedPlayer.inventory?.pump_whistle || 0}</strong>
-                        </div>
-                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
-                          <span className="text-slate-400 text-[10px]">Dump Horn:</span>
-                          <strong className="text-white text-xs">{selectedPlayer.inventory?.dump_horn || 0}</strong>
-                        </div>
-                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
-                          <span className="text-slate-400 text-[10px]">Liq Shield:</span>
-                          <strong className="text-white text-xs">{selectedPlayer.inventory?.liq_shield || 0}</strong>
-                        </div>
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-wider">Inventaris Black Market &amp; Item Game</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+                        {GAME_ITEMS.map((item) => {
+                          const count = selectedPlayer.inventory?.[item.id] || 0;
+                          return (
+                            <div key={item.id} className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
+                              <span className="text-slate-400 text-[10px] flex items-center gap-1.5 truncate pr-1">
+                                <span>{item.icon}</span>
+                                <span className="truncate">{item.name}</span>
+                              </span>
+                              <strong className={`${count > 0 ? item.color : 'text-slate-500'} text-xs font-bold shrink-0 font-mono`}>
+                                {count}
+                              </strong>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1639,7 +1661,7 @@ export default function AdminDashboard() {
                           <option value="ban">
                             {selectedPlayer.isBanned ? '✅ Status Banned & Buka Blokir (Unban)' : '🚫 Status Akun & Suspend / Blokir'}
                           </option>
-                          <option value="compensation">🎁 Suntik Kas &amp; Whale Tokens (Kompensasi)</option>
+                          <option value="compensation">🎁 Suntik Kas, Tokens &amp; Item In-Game (Kompensasi)</option>
                           <option value="reset">🔄 Reset Progres Pemain ke Awal ($100)</option>
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1785,14 +1807,14 @@ export default function AdminDashboard() {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
                             <Gift className="w-3.5 h-3.5" />
-                            Suntik Kas &amp; Tokens (Kompensasi Support)
+                            Suntik Kas, Tokens &amp; Item In-Game (Kompensasi Support)
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 leading-tight">
-                          Tambahkan saldo kas atau Whale Tokens ke akun pemain untuk keperluan ganti rugi bug atau reward khusus.
+                          Tambahkan saldo kas ($), Whale Tokens, atau item Black Market ke akun pemain untuk keperluan ganti rugi bug atau reward khusus.
                         </p>
 
-                        <form onSubmit={handleInjectCompensation} className="flex flex-col gap-2">
+                        <form onSubmit={handleInjectCompensation} className="flex flex-col gap-2.5">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Kas ($):</label>
@@ -1817,6 +1839,39 @@ export default function AdminDashboard() {
                             </div>
                           </div>
 
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Suntik Item In-Game:</label>
+                              <select
+                                value={compItemId}
+                                onChange={(e) => {
+                                  setCompItemId(e.target.value);
+                                  if (e.target.value && !compItemQty) setCompItemQty('1');
+                                }}
+                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-sky-400 cursor-pointer"
+                              >
+                                <option value="">-- Pilih Item (Opsional) --</option>
+                                {GAME_ITEMS.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.icon} {item.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Jumlah Item:</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={compItemQty}
+                                onChange={(e) => setCompItemQty(e.target.value)}
+                                placeholder="Contoh: 1"
+                                disabled={!compItemId}
+                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-purple-300 placeholder:text-slate-600 outline-none focus:border-sky-400 disabled:opacity-50"
+                              />
+                            </div>
+                          </div>
+
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
@@ -1827,7 +1882,7 @@ export default function AdminDashboard() {
                             />
                             <button
                               type="submit"
-                              disabled={modActionLoading || (!compCash && !compTokens)}
+                              disabled={modActionLoading || (!compCash && !compTokens && (!compItemId || !compItemQty))}
                               className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
                             >
                               {modActionLoading ? 'Menyuntikkan...' : '🎁 Suntik Kompensasi'}
@@ -1888,6 +1943,8 @@ export default function AdminDashboard() {
                         setBanReasonInput('');
                         setCompCash('');
                         setCompTokens('');
+                        setCompItemId('');
+                        setCompItemQty('');
                         setCompReason('');
                       }}
                       className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"

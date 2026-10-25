@@ -62,14 +62,26 @@ export async function POST(request) {
       });
     }
 
-    // 2. ACTION: INJECT COMPENSATION / DANA TALANGAN
+    // 2. ACTION: INJECT COMPENSATION / DANA TALANGAN & IN-GAME ITEMS
     if (action === 'inject_compensation') {
       const cashDelta = parseFloat(body.cashDelta || 0);
       const whaleTokensDelta = parseInt(body.whaleTokensDelta || 0, 10);
+      const itemId = body.itemId;
+      const itemQty = parseInt(body.itemQty || 0, 10);
+      const itemsDelta = body.itemsDelta;
       const reason = body.reason || 'Kompensasi / Bantuan Support Admin';
 
-      if (isNaN(cashDelta) && isNaN(whaleTokensDelta)) {
-        return NextResponse.json({ error: 'Nilai kompensasi tidak valid' }, { status: 400 });
+      const ITEM_NAMES = {
+        pump_whistle: 'Whale Pump Whistle',
+        dump_horn: 'Whale Dump Horn',
+        liq_shield: 'Liquidation Shield',
+        leverage_250x: 'God Leverage 250x Ticket',
+        zero_fee: 'Zero-Fee VIP Pass',
+        insider_radar: 'Insider Alpha Radar'
+      };
+
+      if (isNaN(cashDelta) && isNaN(whaleTokensDelta) && !itemId && !itemsDelta) {
+        return NextResponse.json({ error: 'Nilai kompensasi atau item tidak valid' }, { status: 400 });
       }
 
       if (!user.save) {
@@ -80,9 +92,36 @@ export async function POST(request) {
       const currentPeak = user.save.peakNetWorth || currentCash;
       const currentTokens = user.save.whaleTokens || 0;
 
-      const newCash = Math.max(0, currentCash + cashDelta);
+      const newCash = Math.max(0, currentCash + (isNaN(cashDelta) ? 0 : cashDelta));
       const newPeak = Math.max(currentPeak, newCash);
-      const newTokens = Math.max(0, currentTokens + whaleTokensDelta);
+      const newTokens = Math.max(0, currentTokens + (isNaN(whaleTokensDelta) ? 0 : whaleTokensDelta));
+
+      // Calculate updated inventory
+      const currentInventory = (typeof user.save.inventory === 'object' && user.save.inventory !== null)
+        ? { ...user.save.inventory }
+        : (typeof user.save.savePayload?.inventory === 'object' && user.save.savePayload?.inventory !== null)
+        ? { ...user.save.savePayload.inventory }
+        : { pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0 };
+
+      let itemLogText = '';
+      if (itemId && itemQty !== 0 && ITEM_NAMES[itemId]) {
+        currentInventory[itemId] = Math.max(0, (parseInt(currentInventory[itemId], 10) || 0) + itemQty);
+        itemLogText = `${itemQty >= 0 ? '+' : ''}${itemQty} ${ITEM_NAMES[itemId]}`;
+      }
+
+      if (typeof itemsDelta === 'object' && itemsDelta !== null) {
+        const addedItems = [];
+        for (const [k, v] of Object.entries(itemsDelta)) {
+          const qty = parseInt(v, 10) || 0;
+          if (qty !== 0 && ITEM_NAMES[k]) {
+            currentInventory[k] = Math.max(0, (parseInt(currentInventory[k], 10) || 0) + qty);
+            addedItems.push(`${qty >= 0 ? '+' : ''}${qty} ${ITEM_NAMES[k]}`);
+          }
+        }
+        if (addedItems.length > 0) {
+          itemLogText = addedItems.join(', ');
+        }
+      }
 
       // Append compensation log into tradeHistory for transparency
       const existingHistory = Array.isArray(user.save.tradeHistory) ? user.save.tradeHistory : [];
@@ -90,16 +129,22 @@ export async function POST(request) {
         id: `comp-${Date.now()}`,
         timestamp: new Date().toISOString(),
         pairSymbol: 'ADMIN/GRANT',
-        type: cashDelta >= 0 ? 'GRANT' : 'DEDUCT',
+        type: (cashDelta >= 0 && whaleTokensDelta >= 0) ? 'GRANT' : 'DEDUCT',
         leverage: 1,
         entryPrice: 0,
         exitPrice: 0,
-        pnl: cashDelta,
-        note: reason
+        pnl: isNaN(cashDelta) ? 0 : cashDelta,
+        note: itemLogText ? `${reason} [Items: ${itemLogText}]` : reason
       };
 
       const existingPayload = typeof user.save.savePayload === 'object' && user.save.savePayload !== null
-        ? { ...user.save.savePayload, cash: newCash, peakNetWorth: newPeak, whaleTokens: newTokens }
+        ? {
+            ...user.save.savePayload,
+            cash: newCash,
+            peakNetWorth: newPeak,
+            whaleTokens: newTokens,
+            inventory: currentInventory
+          }
         : null;
 
       const updatedSave = await prisma.gameSave.update({
@@ -108,19 +153,26 @@ export async function POST(request) {
           cash: newCash,
           peakNetWorth: newPeak,
           whaleTokens: newTokens,
+          inventory: currentInventory,
           tradeHistory: [compensationLog, ...existingHistory].slice(0, 50),
           savePayload: existingPayload,
           lastSavedAt: new Date()
         }
       });
 
+      const messageParts = [];
+      if (cashDelta !== 0) messageParts.push(`${cashDelta >= 0 ? '+$' + cashDelta.toLocaleString() : '-$' + Math.abs(cashDelta).toLocaleString()} Kas`);
+      if (whaleTokensDelta !== 0) messageParts.push(`${whaleTokensDelta >= 0 ? '+' : ''}${whaleTokensDelta} Tokens`);
+      if (itemLogText) messageParts.push(itemLogText);
+
       return NextResponse.json({
         success: true,
-        message: `Kompensasi berhasil disuntikkan ke akun @${user.username}: +${cashDelta >= 0 ? '$' + cashDelta.toLocaleString() : '-$' + Math.abs(cashDelta).toLocaleString()} Kas & +${whaleTokensDelta} Tokens.`,
+        message: `Kompensasi berhasil disuntikkan ke akun @${user.username}: ${messageParts.join(', ') || 'Item diperbarui'}.`,
         save: {
           cash: updatedSave.cash,
           peakNetWorth: updatedSave.peakNetWorth,
-          whaleTokens: updatedSave.whaleTokens
+          whaleTokens: updatedSave.whaleTokens,
+          inventory: currentInventory
         }
       });
     }
