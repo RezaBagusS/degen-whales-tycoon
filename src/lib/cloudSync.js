@@ -16,12 +16,16 @@ export async function fetchCurrentUser() {
       method: 'GET',
       headers: { 'Cache-Control': 'no-cache' }
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.authenticated && data.user) {
+    const data = await res.json().catch(() => null);
+    if (data) {
+      if (data.resetRequired || data.isBanned) {
+        return data;
+      }
+      if (res.ok && data.authenticated && data.user) {
         return {
           user: data.user,
-          save: data.save
+          save: data.save,
+          pendingCompensations: data.pendingCompensations
         };
       }
     }
@@ -55,8 +59,8 @@ export async function syncGameProgressToDB(gameState, force = false, username = 
       body: JSON.stringify(payload)
     });
 
-    if (res.ok) {
-      const data = await res.json();
+    const data = await res.json().catch(() => null);
+    if (data) {
       return data;
     }
   } catch (err) {
@@ -77,9 +81,12 @@ export async function loadGameProgressFromDB(username = null) {
       method: 'GET',
       headers: { 'Cache-Control': 'no-cache' }
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.found && data.save) {
+    const data = await res.json().catch(() => null);
+    if (data) {
+      if (data.resetRequired || data.isBanned) {
+        return data;
+      }
+      if (res.ok && data.found && data.save) {
         return data;
       }
     }

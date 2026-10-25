@@ -48,6 +48,33 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [adminNotice, setAdminNotice] = useState<{ type: 'reset' | 'banned'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const isReset = params.get('reset') === '1';
+      const isBanned = params.get('banned') === '1';
+      const reason = params.get('reason');
+
+      if (isBanned) {
+        setAdminNotice({
+          type: 'banned',
+          message: reason
+            ? `Akun Anda disuspend oleh Admin. Alasan: "${reason}".`
+            : 'Akun Anda telah disuspend oleh Admin karena pelanggaran aturan game.'
+        });
+        setTab('login');
+      } else if (isReset) {
+        setAdminNotice({
+          type: 'reset',
+          message: 'Progres akun Anda telah direset oleh Admin ke saldo awal ($100 pemula). Silakan login kembali.'
+        });
+        setTab('login');
+      }
+    } catch {}
+  }, []);
 
   // Check if player has existing progress in localStorage
   useEffect(() => {
@@ -311,6 +338,30 @@ export default function AuthPage() {
                 : 'Simpan akun & lanjutkan permainan di browser atau laptop mana saja tanpa hilang riwayat.'}
             </p>
           </div>
+
+          {/* Admin Notice Banner (Reset / Banned) */}
+          {adminNotice && (
+            <div
+              role="alert"
+              className={`mb-6 p-3.5 rounded-xl border text-xs font-medium flex items-start gap-2.5 animate-in fade-in duration-300 ${
+                adminNotice.type === 'banned'
+                  ? 'bg-rose-950/70 border-rose-500/50 text-rose-200'
+                  : 'bg-amber-950/70 border-amber-500/50 text-amber-200'
+              }`}
+            >
+              <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                adminNotice.type === 'banned' ? 'text-rose-400' : 'text-amber-400'
+              }`} />
+              <div className="flex-1">
+                <p className="font-bold mb-0.5 font-mono">
+                  {adminNotice.type === 'banned' ? '⚠️ STATUS AKUN: DIBLOKIR / SUSPEND' : 'ℹ️ NOTIFIKASI ADMIN: PROGRES DIRESET'}
+                </p>
+                <p className="text-[11px] leading-relaxed opacity-90">
+                  {adminNotice.message}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Tabs: Login vs Register vs Forgot */}
           {tab !== 'forgot' ? (

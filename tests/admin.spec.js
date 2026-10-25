@@ -304,5 +304,90 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
       await expect(banner).not.toBeVisible();
     }
   });
+
+  test('admin reset progress redirects to login, resets to anon, and prevents reload loops', async ({ request, page }) => {
+    // 1. Get a user
+    const metricsRes = await request.get('/api/admin/metrics?playersLimit=1', {
+      headers: { 'x-admin-key': adminKey }
+    });
+    const metricsJson = await metricsRes.json();
+    const testUser = metricsJson.players[0];
+    expect(testUser).toBeDefined();
+
+    // 2. Admin resets user progress
+    const resetRes = await request.post('/api/admin/player-action', {
+      headers: { 'x-admin-key': adminKey },
+      data: {
+        action: 'reset_save',
+        userId: testUser.id
+      }
+    });
+    expect(resetRes.status()).toBe(200);
+    const resetJson = await resetRes.json();
+    expect(resetJson.success).toBe(true);
+
+    // 3. User client save triggers: should return resetRequired with redirectTo /login
+    const saveRes1 = await request.post('/api/user/save', {
+      data: {
+        username: testUser.username,
+        state: { cash: 999999, whaleTokens: 99 }
+      }
+    });
+    expect(saveRes1.status()).toBe(200);
+    const saveJson1 = await saveRes1.json();
+    expect(saveJson1.resetRequired).toBe(true);
+    expect(saveJson1.redirectTo).toContain('reset=1');
+
+    // 4. Verify that reset flag is CLEARED from DB and does NOT loop on next save
+    const saveRes2 = await request.post('/api/user/save', {
+      data: {
+        username: testUser.username,
+        state: { cash: 100, whaleTokens: 0 }
+      }
+    });
+    expect(saveRes2.status()).toBe(200);
+    const saveJson2 = await saveRes2.json();
+    expect(saveJson2.resetRequired).toBeUndefined(); // NO infinite loop!
+
+    // 5. Test auth page renders the reset notice banner
+    await page.goto('/auth?mode=login&reset=1');
+    await expect(page.getByText(/NOTIFIKASI ADMIN: PROGRES DIRESET/i)).toBeVisible();
+    await expect(page.getByText(/saldo awal \(\$100 pemula\)/i)).toBeVisible();
+
+    // 6. Test suspend flow: admin bans user
+    const banRes = await request.post('/api/admin/player-action', {
+      headers: { 'x-admin-key': adminKey },
+      data: {
+        action: 'toggle_ban',
+        userId: testUser.id,
+        isBanned: true,
+        banReason: 'Pelanggaran bot script'
+      }
+    });
+    expect(banRes.status()).toBe(200);
+
+    const bannedSaveRes = await request.post('/api/user/save', {
+      data: { username: testUser.username, state: { cash: 100 } }
+    });
+    expect(bannedSaveRes.status()).toBe(403);
+    const bannedJson = await bannedSaveRes.json();
+    expect(bannedJson.isBanned).toBe(true);
+    expect(bannedJson.banReason).toBe('Pelanggaran bot script');
+
+    // Test auth page renders banned banner
+    await page.goto('/auth?mode=login&banned=1&reason=' + encodeURIComponent('Pelanggaran bot script'));
+    await expect(page.getByText(/STATUS AKUN: DIBLOKIR \/ SUSPEND/i)).toBeVisible();
+    await expect(page.getByText(/Pelanggaran bot script/i)).toBeVisible();
+
+    // Unban user to leave DB clean
+    await request.post('/api/admin/player-action', {
+      headers: { 'x-admin-key': adminKey },
+      data: {
+        action: 'toggle_ban',
+        userId: testUser.id,
+        isBanned: false
+      }
+    });
+  });
 });
 

@@ -1385,6 +1385,7 @@ function TradingGame() {
   const [compensationDismissed, setCompensationDismissed] = useState(false);
   const currentUserRef = useRef(null);
   const applyCompensationUpdateRef = useRef(null);
+  const handleAccountTerminationOrResetRef = useRef(null);
 
   const [activePositions, setActivePositions] = useState(() => {
     if (Array.isArray(initial.activePositions)) return initial.activePositions;
@@ -1882,11 +1883,59 @@ function TradingGame() {
     triggerToast('Kompensasi ditutup & tersimpan aman di akun Anda.', 'info');
   }, [receivedCompensation, triggerToast]);
 
+  const handleAccountTerminationOrReset = useCallback((info, actionType = 'reset') => {
+    // 1. Reset user state to anonymous
+    setCurrentUser(null);
+    if (currentUserRef.current) currentUserRef.current = null;
+
+    // 2. Wipe browser saves back to default anon state
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(LEGACY_SAVE_KEY);
+      localStorage.removeItem('degen_dismissed_compensations');
+      sessionStorage.clear();
+    } catch {}
+
+    // 3. Reset in-memory game state to initial anonymous $100
+    const fresh = loadGame();
+    setCash(fresh.cash);
+    setPeakNetWorth(fresh.peakNetWorth);
+    setWhaleTokens(fresh.whaleTokens);
+    setPassiveLevels(fresh.passiveLevels);
+    setInventory(fresh.inventory);
+    setTradeHistory([]);
+    setCashLogs([]);
+
+    // 4. Redirect to login page cleanly without infinite reload loop
+    if (actionType === 'banned' || info?.isBanned) {
+      const reason = info?.banReason || 'Pelanggaran aturan game';
+      triggerToast(`Akun Anda disuspend oleh Admin: ${reason}`, 'danger');
+      setTimeout(() => {
+        window.location.href = info?.redirectTo || `/auth?mode=login&banned=1&reason=${encodeURIComponent(reason)}`;
+      }, 900);
+    } else {
+      triggerToast('Progres akun Anda telah direset ke saldo awal ($100). Mengarahkan ke halaman login...', 'warning');
+      setTimeout(() => {
+        window.location.href = info?.redirectTo || '/auth?mode=login&reset=1';
+      }, 900);
+    }
+  }, [triggerToast]);
+
+  handleAccountTerminationOrResetRef.current = handleAccountTerminationOrReset;
+
   // Cloud Sync & Account State Hydration
   useEffect(() => {
     let mounted = true;
     fetchCurrentUser().then((data) => {
       if (!mounted) return;
+      if (data?.isBanned) {
+        handleAccountTerminationOrReset(data, 'banned');
+        return;
+      }
+      if (data?.resetRequired) {
+        handleAccountTerminationOrReset(data, 'reset');
+        return;
+      }
       if (data?.user) {
         setCurrentUser(data.user);
         // Prompt user without email in DB to add one
@@ -1939,7 +1988,7 @@ function TradingGame() {
     return () => {
       mounted = false;
     };
-  }, [triggerToast, applyCompensationUpdate]);
+  }, [triggerToast, applyCompensationUpdate, handleAccountTerminationOrReset]);
 
   const handleManualCloudSync = useCallback(async () => {
     if (!currentUser || isSyncingCloud) return;
@@ -1947,6 +1996,14 @@ function TradingGame() {
     try {
       if (!latest.current) return;
       const res = await syncGameProgressToDB(latest.current, true, currentUser?.username);
+      if (res?.isBanned) {
+        handleAccountTerminationOrReset(res, 'banned');
+        return;
+      }
+      if (res?.resetRequired) {
+        handleAccountTerminationOrReset(res, 'reset');
+        return;
+      }
       if (res?.success) {
         triggerToast(`Progres game tersinkronkan ke Cloud Akun @${currentUser.username}!`, 'success');
         if (res.compensations && res.compensations.length > 0) {
@@ -1960,7 +2017,7 @@ function TradingGame() {
     } finally {
       setIsSyncingCloud(false);
     }
-  }, [currentUser, isSyncingCloud, triggerToast]);
+  }, [currentUser, isSyncingCloud, triggerToast, applyCompensationUpdate, handleAccountTerminationOrReset]);
 
   const handleManualCloudLoad = useCallback(async () => {
     if (!currentUser) return;
@@ -1970,6 +2027,14 @@ function TradingGame() {
     }
     try {
       const data = await loadGameProgressFromDB();
+      if (data?.isBanned) {
+        handleAccountTerminationOrReset(data, 'banned');
+        return;
+      }
+      if (data?.resetRequired) {
+        handleAccountTerminationOrReset(data, 'reset');
+        return;
+      }
       if (data?.save?.savePayload) {
         localStorage.setItem(SAVE_KEY, JSON.stringify(data.save.savePayload));
         triggerToast('Progres Cloud berhasil dipulihkan! Me-refresh game...', 'success');
@@ -1980,7 +2045,7 @@ function TradingGame() {
     } catch {
       triggerToast('Gagal mengambil file save dari cloud.', 'danger');
     }
-  }, [currentUser, triggerToast]);
+  }, [currentUser, triggerToast, handleAccountTerminationOrReset]);
 
   const handleUserLogout = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -3212,9 +3277,12 @@ function TradingGame() {
       setSaveError(false);
       // Background sync to PostgreSQL database
       syncGameProgressToDB(state, false, currentUserRef.current?.username).then((res) => {
+        if (res?.isBanned) {
+          handleAccountTerminationOrResetRef.current?.(res, 'banned');
+          return;
+        }
         if (res?.resetRequired) {
-          triggerToast('Akun Anda telah direset oleh Admin ke saldo awal.', 'warning');
-          setTimeout(() => window.location.reload(), 1200);
+          handleAccountTerminationOrResetRef.current?.(res, 'reset');
           return;
         }
         if (res?.compensations && res.compensations.length > 0) {

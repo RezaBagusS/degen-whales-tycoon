@@ -26,6 +26,46 @@ export async function GET(request) {
       return NextResponse.json({ authenticated: false });
     }
 
+    if (user.isBanned) {
+      const response = NextResponse.json({
+        authenticated: false,
+        isBanned: true,
+        banReason: user.banReason || 'Pelanggaran aturan game',
+        redirectTo: `/auth?mode=login&banned=1&reason=${encodeURIComponent(user.banReason || 'Pelanggaran aturan game')}`
+      }, { status: 403 });
+      response.cookies.delete(COOKIE_NAME);
+      return response;
+    }
+
+    if (user.save?.activeEffects?.resetRequested || user.save?.savePayload?.resetRequested) {
+      const cleanedEffects = (typeof user.save.activeEffects === 'object' && user.save.activeEffects !== null)
+        ? { ...user.save.activeEffects }
+        : {};
+      delete cleanedEffects.resetRequested;
+
+      const cleanedPayload = (typeof user.save.savePayload === 'object' && user.save.savePayload !== null)
+        ? { ...user.save.savePayload }
+        : { cash: 100, peakNetWorth: 100, whaleTokens: 0 };
+      delete cleanedPayload.resetRequested;
+
+      await prisma.gameSave.update({
+        where: { userId: user.id },
+        data: {
+          activeEffects: cleanedEffects,
+          savePayload: cleanedPayload
+        }
+      });
+
+      const response = NextResponse.json({
+        authenticated: false,
+        resetRequired: true,
+        redirectTo: '/auth?mode=login&reset=1',
+        message: 'Admin telah mereset data akun Anda ke saldo awal pemula ($100).'
+      });
+      response.cookies.delete(COOKIE_NAME);
+      return response;
+    }
+
     const rawPending = [
       ...((Array.isArray(user.save?.savePayload?.pendingCompensations)) ? user.save.savePayload.pendingCompensations : []),
       ...((Array.isArray(user.save?.activeEffects?.pendingCompensations)) ? user.save.activeEffects.pendingCompensations : [])

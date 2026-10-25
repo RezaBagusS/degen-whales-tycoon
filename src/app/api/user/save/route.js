@@ -40,9 +40,14 @@ export async function POST(request) {
     }
 
     if (user.isBanned) {
-      return NextResponse.json({
-        error: `Akun ini disuspend oleh Admin. Alasan: ${user.banReason || 'Pelanggaran aturan game'}`
+      const response = NextResponse.json({
+        error: `Akun ini disuspend oleh Admin. Alasan: ${user.banReason || 'Pelanggaran aturan game'}`,
+        isBanned: true,
+        banReason: user.banReason || 'Pelanggaran aturan game',
+        redirectTo: `/auth?mode=login&banned=1&reason=${encodeURIComponent(user.banReason || 'Pelanggaran aturan game')}`
       }, { status: 403 });
+      response.cookies.delete(COOKIE_NAME);
+      return response;
     }
 
     // Check existing save for pending compensations or admin reset commands
@@ -51,12 +56,33 @@ export async function POST(request) {
     });
 
     if (existingSave?.activeEffects?.resetRequested || existingSave?.savePayload?.resetRequested) {
-      return NextResponse.json({
+      // CLEAR the resetRequested flag immediately in DB so it only triggers ONCE and never loops
+      const cleanedEffects = (typeof existingSave.activeEffects === 'object' && existingSave.activeEffects !== null)
+        ? { ...existingSave.activeEffects }
+        : {};
+      delete cleanedEffects.resetRequested;
+
+      const cleanedPayload = (typeof existingSave.savePayload === 'object' && existingSave.savePayload !== null)
+        ? { ...existingSave.savePayload }
+        : { cash: 100, peakNetWorth: 100, whaleTokens: 0 };
+      delete cleanedPayload.resetRequested;
+
+      await prisma.gameSave.update({
+        where: { userId: user.id },
+        data: {
+          activeEffects: cleanedEffects,
+          savePayload: cleanedPayload
+        }
+      });
+
+      const response = NextResponse.json({
         success: true,
         resetRequired: true,
-        message: 'Admin telah mereset data akun Anda ke saldo pemula.',
-        save: existingSave
+        redirectTo: '/auth?mode=login&reset=1',
+        message: 'Admin telah mereset data akun Anda ke saldo awal pemula ($100). Silakan login kembali.'
       });
+      response.cookies.delete(COOKIE_NAME);
+      return response;
     }
 
     const rawPending = [
