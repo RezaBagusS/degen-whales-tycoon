@@ -34,6 +34,8 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 - **Persistent Order Execution Form**: Place new LONG or SHORT orders at any time using available cash while existing positions continue to run in the background.
 - **Dedicated Open Positions Dashboard**:
   - Live individual card metrics: Direction, leverage, pair symbol, margin, total size, liquidation price, distance percentage, and real-time PnL ($ and %).
+  - **Binance Leverage Tier Brackets (`BINANCE_LEVERAGE_BRACKETS`)**: Enforces maximum position size (Notional Value) limits per leverage tier (250x: $100K, 100x: $250K, 50x: $1.00M, 10x: $10.0M, 2x: $50.0M) with active tier badges and order validation.
+  - **Binance Margin Ratio Health Meter**: Real-time maintenance margin risk calculation ($\text{Margin Ratio} = \frac{\text{Maintenance Margin}}{\text{Position Equity}} \times 100\%$) displayed as a dynamic color-coded visual health bar (`Aman` / `Safe` <40%, `Waspada` / `Warning` 40-74%, `Bahaya Liq` / `Call Danger` ≥75%).
   - **Pure Price ROI Badge**: Clear separation between pure price action returns and leveraged collateral ROI.
   - **One-Click Chart Switch (`Buka Chart`)**: Quick jump to focus the candlestick chart on any active position's trading pair.
   - **Quick TP/SL Modal Trigger**: Adjust Take-Profit and Stop-Loss on any active position on the fly.

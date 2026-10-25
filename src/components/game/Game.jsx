@@ -914,6 +914,13 @@ const LEGACY_SAVE_KEY = 'degen_whale_save_v7';
 const TAB_SYNC_CHANNEL = 'degen_whale_tab_sync';
 const MAX_OFFLINE_SECONDS = 8 * 60 * 60;
 const CASH_AD_COOLDOWN_MS = 180 * 1000; // 3 menit cooldown perlindungan Monetag & game loop
+export const BINANCE_LEVERAGE_BRACKETS = {
+  250: { maxNotional: 100000, mmr: 0.004, label: 'Tier 1 • Max $100K' },
+  100: { maxNotional: 250000, mmr: 0.005, label: 'Tier 1 • Max $250K' },
+  50: { maxNotional: 1000000, mmr: 0.010, label: 'Tier 2 • Max $1.00M' },
+  10: { maxNotional: 10000000, mmr: 0.020, label: 'Tier 3 • Max $10.0M' },
+  2: { maxNotional: 50000000, mmr: 0.050, label: 'Tier 4 • Max $50.0M' }
+};
 let localIdSequence = 0;
 // IDs need uniqueness within this simulation, not a secure-context-only API.
 const makeId = () => `game-${Date.now().toString(36)}-${(++localIdSequence).toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -4595,6 +4602,16 @@ function TradingGame() {
       return;
     }
 
+    const bracket = BINANCE_LEVERAGE_BRACKETS[leverage] || BINANCE_LEVERAGE_BRACKETS[10];
+    const orderNotional = rawMargin * leverage;
+    if (orderNotional > bracket.maxNotional) {
+      triggerToast(
+        `${t.maxBracketExceeded || 'Ukuran posisi melebihi batas Tier Bracket Binance untuk leverage ini!'} (${bracket.label})`,
+        'warning'
+      );
+      return;
+    }
+
     const parsedTp = tpInput.trim() ? Number(tpInput) : null;
     const parsedSl = slInput.trim() ? Number(slInput) : null;
     const validTarget = n => n === null || (Number.isFinite(n) && n > 0);
@@ -6561,8 +6578,13 @@ function TradingGame() {
                   </div>
 
                   <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
-                    <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
-                      <span>{t.leverage || 'LEVERAGE'}</span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.leverage || 'LEVERAGE'}</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700/60" title="Binance Margin Tier Bracket">
+                          {BINANCE_LEVERAGE_BRACKETS[leverage]?.label}
+                        </span>
+                      </div>
                       <span
                         className={`font-mono font-bold ${
                           leverage >= 250
@@ -6725,6 +6747,15 @@ function TradingGame() {
                       const isCurrentPair = pos.pairSymbol === currentPairSymbol;
                       const awayPct = Math.abs((((stats?.posPrice || currentPrice) - pos.liqPrice) / (stats?.posPrice || currentPrice)) * 100).toFixed(1);
 
+                      const maintenanceMargin = pos.margin * 0.08;
+                      const positionEquity = Math.max(0.001, pos.margin + pnl);
+                      const marginRatio = Math.min(100, Math.max(0, (maintenanceMargin / positionEquity) * 100));
+                      const marginStatus = marginRatio >= 75
+                        ? { label: t.marginDanger || 'Bahaya Liq', color: 'text-rose-400 bg-rose-500/10 border-rose-500/30' }
+                        : marginRatio >= 40
+                        ? { label: t.marginWarning || 'Waspada', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
+                        : { label: t.marginSafe || 'Aman', color: 'text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/30' };
+
                       return (
                         <div key={pos.id} className="bg-[#0B0E14] rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden flex flex-col">
                           {/* BARIS 1: Header Ringkasan Posisi & Jarak Likuidasi */}
@@ -6840,7 +6871,7 @@ function TradingGame() {
                                 {pnl >= 0 ? '+' : ''}
                                 {formatMoney(pnl)}{' '}
                                 <span className="text-xs font-bold opacity-90">
-                                  ({pnl >= 0 ? '+' : ''}{roi.toFixed(1)}%)
+                                   ({pnl >= 0 ? '+' : ''}{roi.toFixed(1)}%)
                                 </span>
                               </div>
 
@@ -6867,6 +6898,38 @@ function TradingGame() {
                               >
                                 {t.closePosition || 'Close / TP'}
                               </button>
+                            </div>
+                          </div>
+
+                          {/* BARIS 3: Binance Flow Margin Ratio Health Meter */}
+                          <div className="px-3.5 sm:px-4 py-2 bg-[#0d121c]/70 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 text-[10px] uppercase font-semibold">
+                                {t.marginRatio || 'Margin Ratio'}:
+                              </span>
+                              <span className={`font-bold ${
+                                marginRatio >= 75 ? 'text-rose-400' : marginRatio >= 40 ? 'text-amber-400' : 'text-[#00FF88]'
+                              }`}>
+                                {marginRatio.toFixed(1)}%
+                              </span>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded border font-semibold ${marginStatus.color}`}>
+                                {marginStatus.label}
+                              </span>
+                              <span className="text-slate-500 text-[10px] hidden md:inline">
+                                (Maint: {formatMoney(maintenanceMargin)})
+                              </span>
+                            </div>
+                            <div className="w-full sm:w-44 bg-slate-800/80 rounded-full h-1.5 overflow-hidden border border-slate-700/50">
+                              <div
+                                className={`h-full transition-all duration-300 rounded-full ${
+                                  marginRatio >= 75
+                                    ? 'bg-rose-500 animate-pulse'
+                                    : marginRatio >= 40
+                                    ? 'bg-amber-400'
+                                    : 'bg-[#00FF88]'
+                                }`}
+                                style={{ width: `${Math.min(100, marginRatio)}%` }}
+                              />
                             </div>
                           </div>
                         </div>
