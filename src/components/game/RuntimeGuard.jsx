@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { APP_DISPLAY_VERSION } from '../../lib/version';
 
 // Keep a render/effect failure inside the game instead of losing the whole
 // React root. No telemetry, save deletion, or external requests.
@@ -19,7 +20,7 @@ export default class RuntimeGuard extends React.Component {
     return (
       <main role="alert" className="min-h-screen bg-[#0B0E14] text-slate-100 flex items-center justify-center p-6">
         <section className="w-full max-w-lg space-y-5 rounded-2xl border border-amber-400/40 bg-[#111622] p-6">
-          <span className="font-mono text-sm text-emerald-300">DEGEN &amp; WHALE / V1.3.1</span>
+          <span className="font-mono text-sm text-emerald-300">DEGEN &amp; WHALE / {APP_DISPLAY_VERSION}</span>
           <h1 className="text-2xl font-bold">Game belum berhasil dimuat</h1>
           <p className="text-base text-slate-300">
             Terjadi kesalahan saat menampilkan game. Simpanan tidak dihapus.

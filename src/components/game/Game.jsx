@@ -83,6 +83,7 @@ import PnlShareModal from './PnlShareModal';
 import MemeLaunchpad from './MemeLaunchpad';
 import { DegenShop } from './DegenShop';
 import { ADS_CONFIG } from '../../config/adsConfig';
+import { APP_DISPLAY_VERSION } from '../../lib/version';
 import RewardedAdModal from './RewardedAdModal';
 import CreditsModal from './CreditsModal';
 import { syncGameProgressToDB, fetchCurrentUser, logoutUser, loadGameProgressFromDB } from '../../lib/cloudSync';
@@ -5183,7 +5184,7 @@ function TradingGame() {
                   DEGEN <span className="text-[#00FF88]">&amp;</span> WHALE
                 </h1>
                 <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/30">
-                  v1.3.1 FIX
+                  {APP_DISPLAY_VERSION}
                 </span>
               </div>
             </div>

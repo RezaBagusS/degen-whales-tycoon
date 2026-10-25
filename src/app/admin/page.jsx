@@ -25,6 +25,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { APP_DISPLAY_VERSION } from '../../lib/version';
 
 const LOCATION_NAMES = {
   1: 'Kamar Kos Sempit',
@@ -217,7 +218,7 @@ export default function AdminDashboard() {
                 DEGEN &amp; WHALE <span className="text-emerald-400">OPS CENTER</span>
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                v1.5.0
+                {APP_DISPLAY_VERSION}
               </span>
             </div>
             <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2">

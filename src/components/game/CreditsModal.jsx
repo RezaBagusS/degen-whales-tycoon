@@ -3,6 +3,7 @@
 import React from 'react';
 import { Award, Heart, ExternalLink, X, Sparkles, Terminal, Code2, Users, Cpu } from 'lucide-react';
 import { ADS_CONFIG } from '../../config/adsConfig';
+import { APP_DISPLAY_VERSION } from '../../lib/version';
 
 export default function CreditsModal({ isOpen, onClose, language = 'id' }) {
   if (!isOpen) return null;
@@ -23,7 +24,7 @@ export default function CreditsModal({ isOpen, onClose, language = 'id' }) {
               <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
                 <span>{isEn ? 'Game Credits & About' : 'Kredit Game & Pengembang'}</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-emerald-500/30">
-                  v1.3.1
+                  {APP_DISPLAY_VERSION}
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
