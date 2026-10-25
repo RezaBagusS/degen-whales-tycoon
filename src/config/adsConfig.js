@@ -34,7 +34,7 @@ export const ADS_CONFIG = {
     directLinkZoneId: '12106307',
     onClickZoneId: '12121486',
     onClickScriptUrl: 'https://al5sm.com/tag.min.js',
-    onClickIntervalHours: 4 // Frekuensi iklan OnClick per pemain (setiap 4 jam)
+    onClickIntervalHours: 6 // Frekuensi iklan OnClick per pemain (setiap 6 jam)
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)

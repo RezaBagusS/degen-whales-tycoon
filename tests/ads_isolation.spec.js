@@ -39,8 +39,8 @@ test.describe('Ads Isolation Verification', () => {
     expect(scripts.some((src) => src.includes('al5sm.com') || src.includes('alwingulla.com'))).toBe(false);
   });
 
-  test('Monetag OnClick suppresses script if within 4-hour interval', async ({ page }) => {
-    // Seed localStorage with a timestamp from 1 hour ago (< 4 hours cooldown)
+  test('Monetag OnClick suppresses script if within 6-hour interval', async ({ page }) => {
+    // Seed localStorage with a timestamp from 1 hour ago (< 6 hours cooldown)
     await page.addInitScript(() => {
       localStorage.setItem('degen_monetag_last_shown_ts', String(Date.now() - 3600000));
     });

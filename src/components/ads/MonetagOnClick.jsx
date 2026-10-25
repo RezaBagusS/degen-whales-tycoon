@@ -32,7 +32,7 @@ export default function MonetagOnClick() {
     const STORAGE_KEY = 'degen_monetag_last_shown_ts';
     const LEGACY_STORAGE_KEY = 'degen_monetag_onclick_last_ts';
     const SESSION_KEY = 'degen_monetag_session_fired';
-    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 4;
+    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 6;
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
     // Cek batas frekuensi waktu terakhir iklan muncul (4 Jam) & Session Lock
