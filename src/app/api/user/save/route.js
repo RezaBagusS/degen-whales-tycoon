@@ -39,6 +39,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    if (user.isBanned) {
+      return NextResponse.json({
+        error: `Akun ini disuspend oleh Admin. Alasan: ${user.banReason || 'Pelanggaran aturan game'}`
+      }, { status: 403 });
+    }
+
     // Upsert game save with full payload
     const gameSave = await prisma.gameSave.upsert({
       where: { userId: user.id },

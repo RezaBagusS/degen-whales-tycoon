@@ -132,6 +132,8 @@ export async function GET(request) {
         lastActive: lastActiveDate.toISOString(),
         isOnline,
         isActive24h,
+        isBanned: Boolean(u.isBanned),
+        banReason: u.banReason || null,
         cash: save?.cash || 0,
         peakNetWorth: save?.peakNetWorth || 0,
         whaleTokens: save?.whaleTokens || 0,
@@ -179,6 +181,42 @@ export async function GET(request) {
     const totalPositions = allActivePositions.length;
     const paginatedPositions = allActivePositions.slice((positionsPage - 1) * positionsLimit, positionsPage * positionsLimit);
 
+    // 24-hour hourly trend aggregation
+    const hourlyActivity = [];
+    const oneHourMs = 60 * 60 * 1000;
+    for (let i = 23; i >= 0; i--) {
+      const bucketStart = new Date(now - (i + 1) * oneHourMs);
+      const bucketEnd = new Date(now - i * oneHourMs);
+      const hourLabel = `${String(bucketEnd.getHours()).padStart(2, '0')}:00`;
+
+      // Players active in this hour
+      const activeInHour = allPlayerList.filter(p => {
+        const t = new Date(p.lastActive).getTime();
+        return t >= bucketStart.getTime() && t < bucketEnd.getTime();
+      }).length;
+
+      // Trades in this hour
+      const tradesInHour = allRecentTrades.filter(tr => {
+        const t = new Date(tr.timestamp || 0).getTime();
+        return t >= bucketStart.getTime() && t < bucketEnd.getTime();
+      });
+
+      const volumeInHour = tradesInHour.reduce((acc, tr) => acc + Math.abs(tr.pnl || 0), 0);
+
+      hourlyActivity.push({
+        hour: hourLabel,
+        activeUsers: activeInHour,
+        tradesCount: tradesInHour.length,
+        volume: Math.round(volumeInHour * 100) / 100
+      });
+    }
+
+    // Active broadcast announcement
+    const activeBroadcast = await prisma.broadcastAnnouncement.findFirst({
+      where: { isActive: true },
+      orderBy: { updatedAt: 'desc' }
+    });
+
     // APM metrics
     const apm = telemetry.getMetrics();
     const duration = Math.round(performance.now() - startReq);
@@ -197,6 +235,8 @@ export async function GET(request) {
         openPositionsCount: allActivePositions.length,
         dbLatencyMs
       },
+      activeBroadcast: activeBroadcast || null,
+      hourlyActivity,
       apm,
       players: paginatedPlayers,
       playersPagination: {

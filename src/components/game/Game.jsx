@@ -77,7 +77,8 @@ import {
   ExternalLink,
   User,
   Cloud,
-  LogOut
+  LogOut,
+  Megaphone
 } from 'lucide-react';
 import { TRANSLATIONS } from '../../i18n/translations';
 import { BlackMarketTab, InventoryQuickBar, BLACK_MARKET_ITEMS } from './BlackMarket';
@@ -1341,6 +1342,43 @@ function TradingGame() {
   const [adjustTpInput, setAdjustTpInput] = useState('');
   const [adjustSlInput, setAdjustSlInput] = useState('');
   const [adjustError, setAdjustError] = useState('');
+
+  // Global In-Game Broadcast Announcement State
+  const [globalBroadcast, setGlobalBroadcast] = useState(null);
+  const [broadcastDismissed, setBroadcastDismissed] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBroadcast = async () => {
+      try {
+        const res = await fetch('/api/broadcast');
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted) {
+            if (json.active && json.broadcast) {
+              setGlobalBroadcast((prev) => {
+                if (prev?.id !== json.broadcast.id) {
+                  setBroadcastDismissed(false);
+                }
+                return json.broadcast;
+              });
+            } else {
+              setGlobalBroadcast(null);
+            }
+          }
+        }
+      } catch {
+        // Silent
+      }
+    };
+
+    fetchBroadcast();
+    const interval = setInterval(fetchBroadcast, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const [activePositions, setActivePositions] = useState(() => {
     if (Array.isArray(initial.activePositions)) return initial.activePositions;
@@ -5452,6 +5490,49 @@ function TradingGame() {
           </div>
         </div>
       </header>
+      {/* Global In-Game Broadcast Announcement Banner */}
+      {globalBroadcast && globalBroadcast.isActive && !broadcastDismissed && (
+        <div
+          data-testid="global-broadcast-banner"
+          className={`border-b px-4 py-2 text-xs font-medium shadow-lg transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+            globalBroadcast.type === 'pump'
+              ? 'bg-gradient-to-r from-emerald-950/90 via-emerald-900/80 to-slate-950 border-emerald-500/50 text-emerald-200'
+              : globalBroadcast.type === 'warning'
+              ? 'bg-gradient-to-r from-red-950/90 via-rose-950/80 to-slate-950 border-rose-500/50 text-rose-200'
+              : globalBroadcast.type === 'event'
+              ? 'bg-gradient-to-r from-purple-950/90 via-indigo-950/80 to-slate-950 border-purple-500/50 text-purple-200'
+              : 'bg-gradient-to-r from-cyan-950/90 via-blue-950/80 to-slate-950 border-cyan-500/50 text-cyan-200'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0 border ${
+                globalBroadcast.type === 'pump'
+                  ? 'bg-emerald-500/20 text-[#00FF88] border-emerald-500/40 shadow-sm shadow-[#00FF88]/20'
+                  : globalBroadcast.type === 'warning'
+                  ? 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-sm shadow-rose-500/20'
+                  : globalBroadcast.type === 'event'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm shadow-purple-500/20'
+                  : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm shadow-cyan-500/20'
+              }`}>
+                <Megaphone className="w-3 h-3 animate-pulse" />
+                {globalBroadcast.type === 'pump' ? '🚀 PUMP ALERT' : globalBroadcast.type === 'warning' ? '⚠️ PERINGATAN' : globalBroadcast.type === 'event' ? '🎉 EVENT WHALE' : '📢 PENGUMUMAN'}
+              </span>
+              <p className="truncate text-xs text-slate-100 font-sans tracking-wide">
+                {globalBroadcast.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setBroadcastDismissed(true)}
+              className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0 cursor-pointer"
+              title="Tutup pengumuman"
+              aria-label="Tutup pengumuman"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
       {saveError && (
         <div role="alert" className="bg-amber-950/95 border-b border-amber-500/40 px-4 py-2 text-xs text-amber-200 shadow-md">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">

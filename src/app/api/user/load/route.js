@@ -30,6 +30,14 @@ export async function GET(request) {
       });
     }
 
+    if (user && user.isBanned) {
+      return NextResponse.json({
+        found: false,
+        isBanned: true,
+        error: `Akun ini disuspend oleh Admin. Alasan: ${user.banReason || 'Pelanggaran aturan game'}`
+      }, { status: 403 });
+    }
+
     if (!user || !user.save) {
       return NextResponse.json({
         found: false,

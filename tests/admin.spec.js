@@ -81,4 +81,72 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     await page.getByRole('button', { name: /APM & Sentry Logs/i }).click();
     await expect(page.getByText('Sentry & APM Telemetry Engine')).toBeVisible();
   });
+
+  test('admin dashboard renders trend chart and broadcast controls', async ({ page }) => {
+    await page.goto('/admin');
+    await page.locator('input[type="password"]').fill(adminKey);
+    await page.getByRole('button', { name: /Buka Dashboard Ops/i }).click();
+
+    // Verify 24h Trend Chart is present on Overview tab
+    await expect(page.getByText('Grafik Tren Aktivitas 24 Jam')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Pemain Aktif/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Volume/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Transaksi/i })).toBeVisible();
+
+    // Verify In-Game Broadcast card is present
+    await expect(page.getByText(/In-Game Broadcast/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/Ketik pesan broadcast/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Siarkan Sekarang/i })).toBeVisible();
+  });
+
+  test('manages global announcements via /api/admin/broadcast and /api/broadcast', async ({ request }) => {
+    // 1. Post a test announcement
+    const postRes = await request.post('/api/admin/broadcast', {
+      headers: { 'x-admin-key': adminKey },
+      data: {
+        message: 'Playwright Test Broadcast - Moon Mission!',
+        type: 'pump',
+        durationMinutes: 10
+      }
+    });
+    expect(postRes.status()).toBe(200);
+    const postJson = await postRes.json();
+    expect(postJson.success).toBe(true);
+    expect(postJson.broadcast.message).toBe('Playwright Test Broadcast - Moon Mission!');
+
+    // 2. Verify public endpoint /api/broadcast serves it
+    const publicRes = await request.get('/api/broadcast');
+    expect(publicRes.status()).toBe(200);
+    const publicJson = await publicRes.json();
+    expect(publicJson.active).toBe(true);
+    expect(publicJson.broadcast.message).toBe('Playwright Test Broadcast - Moon Mission!');
+    expect(publicJson.broadcast.type).toBe('pump');
+
+    // 3. Clear/deactivate broadcast
+    const delRes = await request.delete('/api/admin/broadcast', {
+      headers: { 'x-admin-key': adminKey }
+    });
+    expect(delRes.status()).toBe(200);
+
+    // 4. Verify public endpoint now shows no active broadcast
+    const checkRes = await request.get('/api/broadcast');
+    const checkJson = await checkRes.json();
+    expect(checkJson.active).toBe(false);
+  });
+
+  test('rejects unauthenticated player actions and validates input', async ({ request }) => {
+    // Missing admin key
+    const unauth = await request.post('/api/admin/player-action', {
+      data: { action: 'toggle_ban', userId: 'user-xyz' }
+    });
+    expect(unauth.status()).toBe(401);
+
+    // Invalid action
+    const invalidAction = await request.post('/api/admin/player-action', {
+      headers: { 'x-admin-key': adminKey },
+      data: { action: 'invalid_action', userId: 'user-xyz' }
+    });
+    expect(invalidAction.status()).toBe(400);
+  });
 });
+

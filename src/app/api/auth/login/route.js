@@ -28,6 +28,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 });
     }
 
+    if (user.isBanned) {
+      return NextResponse.json({
+        error: `Akun ini telah disuspend oleh Admin. Alasan: ${user.banReason || 'Pelanggaran aturan game'}`
+      }, { status: 403 });
+    }
+
     // Generate session token
     const sessionToken = createSessionToken(user);
     const response = NextResponse.json({

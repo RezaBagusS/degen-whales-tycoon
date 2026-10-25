@@ -28,7 +28,12 @@ import {
   Sparkles,
   ChevronLeft,
   Download,
-  X
+  X,
+  Megaphone,
+  Ban,
+  Gift,
+  RotateCcw,
+  BarChart2
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -162,6 +167,183 @@ function TableSkeleton({ cols = 8, rows = 5 }) {
   );
 }
 
+/**
+ * 24-Hour Visual Trend Chart Component (Zero-Dependency Native SVG Area & Line Chart)
+ */
+function HourlyTrendChart({ data = [] }) {
+  const [activeMetric, setActiveMetric] = useState('activeUsers'); // 'activeUsers' | 'volume' | 'tradesCount'
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  if (!data || data.length === 0) return null;
+
+  const points = data;
+  const values = points.map(p => p[activeMetric] || 0);
+  const maxValue = Math.max(1, ...values);
+  
+  // Chart geometry
+  const width = 800;
+  const height = 160;
+  const paddingLeft = 40;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 30;
+  const chartW = width - paddingLeft - paddingRight;
+  const chartH = height - paddingTop - paddingBottom;
+
+  const coordinates = points.map((p, idx) => {
+    const x = paddingLeft + (idx / Math.max(1, points.length - 1)) * chartW;
+    const y = paddingTop + chartH - ((p[activeMetric] || 0) / maxValue) * chartH;
+    return { x, y, point: p, val: p[activeMetric] || 0 };
+  });
+
+  // Build SVG path
+  let pathD = `M ${coordinates[0].x} ${coordinates[0].y}`;
+  for (let i = 1; i < coordinates.length; i++) {
+    const prev = coordinates[i - 1];
+    const curr = coordinates[i];
+    const cX = (prev.x + curr.x) / 2;
+    pathD += ` C ${cX} ${prev.y}, ${cX} ${curr.y}, ${curr.x} ${curr.y}`;
+  }
+
+  const areaD = `${pathD} L ${coordinates[coordinates.length - 1].x} ${paddingTop + chartH} L ${coordinates[0].x} ${paddingTop + chartH} Z`;
+
+  const themeColors = {
+    activeUsers: { stroke: '#00FF88', fill: 'url(#emeraldGrad)', text: 'text-[#00FF88]', label: 'Pemain Aktif' },
+    volume: { stroke: '#38BDF8', fill: 'url(#skyGrad)', text: 'text-sky-400', label: 'Volume PnL ($)' },
+    tradesCount: { stroke: '#C084FC', fill: 'url(#purpleGrad)', text: 'text-purple-400', label: 'Total Transaksi' }
+  };
+
+  const currentTheme = themeColors[activeMetric];
+
+  return (
+    <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 font-mono">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="w-4 h-4 text-emerald-400" />
+          <span className="font-bold text-sm text-white">Grafik Tren Aktivitas 24 Jam</span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+            Realtime Hourly Telemetry
+          </span>
+        </div>
+
+        {/* Metric Switcher */}
+        <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('activeUsers')}
+            className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+              activeMetric === 'activeUsers' ? 'bg-emerald-500/20 text-[#00FF88] font-bold border border-emerald-500/30' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Pemain Aktif
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMetric('volume')}
+            className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+              activeMetric === 'volume' ? 'bg-sky-500/20 text-sky-400 font-bold border border-sky-500/30' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Volume ($)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMetric('tradesCount')}
+            className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+              activeMetric === 'tradesCount' ? 'bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Transaksi
+          </button>
+        </div>
+      </div>
+
+      {/* SVG Canvas */}
+      <div className="relative w-full overflow-hidden">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44 select-none">
+          <defs>
+            <linearGradient id="emeraldGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00FF88" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#00FF88" stopOpacity="0.0" />
+            </linearGradient>
+            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.0" />
+            </linearGradient>
+            <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#C084FC" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#C084FC" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1={paddingLeft} y1={paddingTop} x2={width - paddingRight} y2={paddingTop} stroke="#1E293B" strokeDasharray="3 3" />
+          <line x1={paddingLeft} y1={paddingTop + chartH / 2} x2={width - paddingRight} y2={paddingTop + chartH / 2} stroke="#1E293B" strokeDasharray="3 3" />
+          <line x1={paddingLeft} y1={paddingTop + chartH} x2={width - paddingRight} y2={paddingTop + chartH} stroke="#334155" />
+
+          {/* Y Axis labels */}
+          <text x={paddingLeft - 8} y={paddingTop + 4} fill="#64748B" fontSize="9" textAnchor="end">
+            {activeMetric === 'volume' ? `$${maxValue}` : maxValue}
+          </text>
+          <text x={paddingLeft - 8} y={paddingTop + chartH} fill="#64748B" fontSize="9" textAnchor="end">
+            0
+          </text>
+
+          {/* Filled Area */}
+          <path d={areaD} fill={currentTheme.fill} />
+
+          {/* Stroke Line */}
+          <path d={pathD} fill="none" stroke={currentTheme.stroke} strokeWidth="2.5" strokeLinecap="round" />
+
+          {/* Points & Hover Target */}
+          {coordinates.map((c, i) => (
+            <g key={i}>
+              <circle
+                cx={c.x}
+                cy={c.y}
+                r={hoveredPoint === i ? 5 : 2.5}
+                fill="#0B0F19"
+                stroke={currentTheme.stroke}
+                strokeWidth={hoveredPoint === i ? 3 : 1.5}
+                className="transition-all duration-150"
+              />
+              <circle
+                cx={c.x}
+                cy={c.y}
+                r="12"
+                fill="transparent"
+                onMouseEnter={() => setHoveredPoint(i)}
+                onMouseLeave={() => setHoveredPoint(null)}
+                className="cursor-pointer"
+              />
+              {i % 3 === 0 && (
+                <text x={c.x} y={height - 8} fill="#64748B" fontSize="9" textAnchor="middle">
+                  {c.point.hour}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+
+        {/* Floating Tooltip */}
+        {hoveredPoint !== null && coordinates[hoveredPoint] && (
+          <div
+            className="absolute -top-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] shadow-xl pointer-events-none transform -translate-x-1/2 flex items-center gap-1.5"
+            style={{
+              left: `${(coordinates[hoveredPoint].x / width) * 100}%`
+            }}
+          >
+            <span className="text-slate-400">{coordinates[hoveredPoint].point.hour}:</span>
+            <span className={`font-bold ${currentTheme.text}`}>
+              {activeMetric === 'volume' ? formatMoney(coordinates[hoveredPoint].val) : coordinates[hoveredPoint].val} {currentTheme.label}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -196,6 +378,20 @@ export default function AdminDashboard() {
   const [adminResetMsg, setAdminResetMsg] = useState(null);
   const [showAdminPass, setShowAdminPass] = useState(false);
   const [, startTransition] = useTransition();
+
+  // In-Game Broadcast Announcement States
+  const [broadcastMsgInput, setBroadcastMsgInput] = useState('');
+  const [broadcastType, setBroadcastType] = useState('info'); // 'info' | 'pump' | 'warning' | 'event'
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastFeedback, setBroadcastFeedback] = useState(null);
+
+  // CRM Moderation States (Ban, Compensation, Reset)
+  const [banReasonInput, setBanReasonInput] = useState('');
+  const [compCash, setCompCash] = useState('');
+  const [compTokens, setCompTokens] = useState('');
+  const [compReason, setCompReason] = useState('');
+  const [modActionLoading, setModActionLoading] = useState(false);
+  const [modActionMsg, setModActionMsg] = useState(null);
 
   // Load saved admin key from sessionStorage on mount
   useEffect(() => {
@@ -402,6 +598,158 @@ export default function AdminDashboard() {
       setAdminResetMsg({ type: 'error', text: 'Kesalahan jaringan saat menghubungi server.' });
     } finally {
       setAdminResetLoading(false);
+    }
+  };
+
+  // Broadcast Handlers
+  const handleSendBroadcast = async (e) => {
+    if (e) e.preventDefault();
+    if (!broadcastMsgInput.trim()) return;
+    setBroadcastLoading(true);
+    setBroadcastFeedback(null);
+    try {
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ message: broadcastMsgInput.trim(), type: broadcastType, isActive: true })
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setBroadcastFeedback({ type: 'error', text: resData.error || 'Gagal mengirim siaran.' });
+      } else {
+        setBroadcastFeedback({ type: 'success', text: '✓ Pengumuman berhasil disiarkan ke seluruh pemain!' });
+        fetchMetrics(adminKey);
+      }
+    } catch {
+      setBroadcastFeedback({ type: 'error', text: 'Gagal menghubungi server broadcast.' });
+    } finally {
+      setBroadcastLoading(false);
+    }
+  };
+
+  const handleStopBroadcast = async () => {
+    setBroadcastLoading(true);
+    setBroadcastFeedback(null);
+    try {
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey }
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setBroadcastFeedback({ type: 'error', text: resData.error || 'Gagal menghentikan siaran.' });
+      } else {
+        setBroadcastFeedback({ type: 'success', text: '✓ Siaran pengumuman global dinonaktifkan.' });
+        setBroadcastMsgInput('');
+        fetchMetrics(adminKey);
+      }
+    } catch {
+      setBroadcastFeedback({ type: 'error', text: 'Gagal menghubungi server.' });
+    } finally {
+      setBroadcastLoading(false);
+    }
+  };
+
+  // Player Moderation Handlers
+  const handleToggleBan = async (isBanned) => {
+    if (!selectedPlayer) return;
+    setModActionLoading(true);
+    setModActionMsg(null);
+    try {
+      const res = await fetch('/api/admin/player-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({
+          action: 'toggle_ban',
+          userId: selectedPlayer.id,
+          isBanned,
+          banReason: isBanned ? (banReasonInput || 'Pelanggaran aturan game') : null
+        })
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setModActionMsg({ type: 'error', text: resData.error || 'Gagal mengubah status suspend.' });
+      } else {
+        setModActionMsg({ type: 'success', text: resData.message });
+        setSelectedPlayer(prev => prev ? { ...prev, isBanned, banReason: isBanned ? banReasonInput : null } : null);
+        fetchMetrics(adminKey);
+      }
+    } catch {
+      setModActionMsg({ type: 'error', text: 'Gagal terhubung ke server.' });
+    } finally {
+      setModActionLoading(false);
+    }
+  };
+
+  const handleInjectCompensation = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedPlayer) return;
+    const cashVal = parseFloat(compCash || 0);
+    const tokenVal = parseInt(compTokens || 0, 10);
+    if (!cashVal && !tokenVal) {
+      setModActionMsg({ type: 'error', text: 'Masukkan jumlah Kas ($) atau Whale Tokens yang ingin disuntikkan.' });
+      return;
+    }
+    setModActionLoading(true);
+    setModActionMsg(null);
+    try {
+      const res = await fetch('/api/admin/player-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({
+          action: 'inject_compensation',
+          userId: selectedPlayer.id,
+          cashDelta: cashVal,
+          whaleTokensDelta: tokenVal,
+          reason: compReason || 'Kompensasi / Bantuan Support Admin'
+        })
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setModActionMsg({ type: 'error', text: resData.error || 'Gagal menyuntikkan kompensasi.' });
+      } else {
+        setModActionMsg({ type: 'success', text: resData.message });
+        setSelectedPlayer(prev => prev ? {
+          ...prev,
+          cash: resData.save?.cash ?? (prev.cash + cashVal),
+          whaleTokens: resData.save?.whaleTokens ?? (prev.whaleTokens + tokenVal)
+        } : null);
+        setCompCash('');
+        setCompTokens('');
+        setCompReason('');
+        fetchMetrics(adminKey);
+      }
+    } catch {
+      setModActionMsg({ type: 'error', text: 'Gagal terhubung ke server.' });
+    } finally {
+      setModActionLoading(false);
+    }
+  };
+
+  const handleResetSave = async () => {
+    if (!selectedPlayer) return;
+    const confirmReset = window.confirm(`Apakah Anda YAKIN ingin mereset seluruh progres akun @${selectedPlayer.username} ke $100 saldo awal? Tindakan ini tidak dapat dibatalkan!`);
+    if (!confirmReset) return;
+    setModActionLoading(true);
+    setModActionMsg(null);
+    try {
+      const res = await fetch('/api/admin/player-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ action: 'reset_save', userId: selectedPlayer.id })
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setModActionMsg({ type: 'error', text: resData.error || 'Gagal mereset progres pemain.' });
+      } else {
+        setModActionMsg({ type: 'success', text: resData.message });
+        setSelectedPlayer(prev => prev ? { ...prev, cash: 100, peakNetWorth: 100, whaleTokens: 0, currentLocationLevel: 1 } : null);
+        fetchMetrics(adminKey);
+      }
+    } catch {
+      setModActionMsg({ type: 'error', text: 'Gagal terhubung ke server.' });
+    } finally {
+      setModActionLoading(false);
     }
   };
 
@@ -711,6 +1059,96 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* IN-GAME BROADCAST / PENGUMUMAN GLOBAL CONTROL */}
+            <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 font-mono">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-amber-400" />
+                  <span className="font-bold text-sm text-white">In-Game Broadcast &amp; Pengumuman Global</span>
+                  {data?.activeBroadcast && data.activeBroadcast.isActive ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-[#00FF88] border border-emerald-500/30 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Siaran Aktif
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                      Tidak Ada Siaran Aktif
+                    </span>
+                  )}
+                </div>
+
+                {data?.activeBroadcast && data.activeBroadcast.isActive && (
+                  <button
+                    type="button"
+                    onClick={handleStopBroadcast}
+                    disabled={broadcastLoading}
+                    className="px-2.5 py-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    Hentikan Siaran
+                  </button>
+                )}
+              </div>
+
+              {/* Display Current Active Broadcast Preview if exists */}
+              {data?.activeBroadcast && data.activeBroadcast.isActive && (
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center gap-2.5">
+                  <span className="text-base">
+                    {data.activeBroadcast.type === 'pump' ? '🚀' : data.activeBroadcast.type === 'warning' ? '⚠️' : data.activeBroadcast.type === 'event' ? '🏆' : '📢'}
+                  </span>
+                  <div className="flex-1">
+                    <span className="text-slate-400 text-[10px] block uppercase font-bold">Pesan Sedang Tayang di Layar Pemain:</span>
+                    <span className="text-white font-semibold">{data.activeBroadcast.message}</span>
+                  </div>
+                </div>
+              )}
+
+              {broadcastFeedback && (
+                <div className={`p-2.5 rounded-xl text-xs ${broadcastFeedback.type === 'error' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-[#00FF88] border border-emerald-500/30'}`}>
+                  {broadcastFeedback.text}
+                </div>
+              )}
+
+              {/* Form Send New Broadcast */}
+              <form onSubmit={handleSendBroadcast} className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={broadcastMsgInput}
+                      onChange={(e) => setBroadcastMsgInput(e.target.value)}
+                      placeholder="Ketik pesan broadcast ke layar pemain (misal: 🚀 Pump event DEGEN/USDT dimulai!)..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={broadcastType}
+                      onChange={(e) => setBroadcastType(e.target.value)}
+                      className="px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-slate-700 font-mono cursor-pointer"
+                    >
+                      <option value="info">📢 Info Umum</option>
+                      <option value="pump">🚀 Pump Event</option>
+                      <option value="warning">⚠️ Warning / Maintenance</option>
+                      <option value="event">🏆 Event / Misi</option>
+                    </select>
+
+                    <button
+                      type="submit"
+                      disabled={broadcastLoading || !broadcastMsgInput.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0 flex items-center gap-1.5 shadow-lg shadow-amber-500/10"
+                    >
+                      <Megaphone className="w-3.5 h-3.5" />
+                      <span>{broadcastLoading ? 'Menyiarkan...' : 'Siarkan Sekarang'}</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* 24-Hour Interactive Activity Trend Chart */}
+            <HourlyTrendChart data={data?.hourlyActivity || []} />
+
             {/* Closed Trade Feed with Pagination */}
             <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1007,6 +1445,12 @@ export default function AdminDashboard() {
                                   Offline
                                 </span>
                               )}
+                              {player.isBanned && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-bold">
+                                  <Ban className="w-2.5 h-2.5" />
+                                  BANNED
+                                </span>
+                              )}
                               <span>@{player.username}</span>
                               {player.syndicateTag && (
                                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
@@ -1190,12 +1634,155 @@ export default function AdminDashboard() {
                     </form>
                   </div>
 
+                  {/* Player Moderation: Ban & Suspend */}
+                  <div className={`p-3.5 rounded-2xl border space-y-2.5 ${selectedPlayer.isBanned ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-900/80 border-slate-800'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
+                        <Ban className="w-3.5 h-3.5" />
+                        Status Moderasi Akun
+                      </span>
+                      {selectedPlayer.isBanned ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
+                          🚫 TERBLOKIR / SUSPEND
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/20">
+                          ● Akun Normal
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedPlayer.isBanned ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-rose-300">
+                          Alasan: <em>&ldquo;{selectedPlayer.banReason || 'Pelanggaran aturan game'}&rdquo;</em>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBan(false)}
+                          disabled={modActionLoading}
+                          className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs cursor-pointer transition-all disabled:opacity-50"
+                        >
+                          {modActionLoading ? 'Memproses...' : '✅ Cabut Status Suspend (Unban)'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-400 leading-tight">
+                          Blokir akses login dan penyimpanan akun ini jika dicurigai cheat atau eksploitasi sistem.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={banReasonInput}
+                            onChange={(e) => setBanReasonInput(e.target.value)}
+                            placeholder="Alasan suspend akun (opsional)..."
+                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 outline-none focus:border-rose-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBan(true)}
+                            disabled={modActionLoading}
+                            className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-mono font-bold text-xs cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                          >
+                            {modActionLoading ? 'Memproses...' : '🚫 Suspend Akun'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Player Moderation: Inject Compensation */}
+                  <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-sky-400 flex items-center gap-1.5">
+                        <Gift className="w-3.5 h-3.5" />
+                        Suntik Kas &amp; Tokens (Kompensasi Support)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-tight">
+                      Tambahkan saldo kas atau Whale Tokens ke akun pemain untuk keperluan ganti rugi bug atau reward khusus.
+                    </p>
+
+                    <form onSubmit={handleInjectCompensation} className="flex flex-col gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Kas ($):</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={compCash}
+                            onChange={(e) => setCompCash(e.target.value)}
+                            placeholder="Contoh: 500"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-[#00FF88] placeholder:text-slate-600 outline-none focus:border-sky-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Tokens:</label>
+                          <input
+                            type="number"
+                            value={compTokens}
+                            onChange={(e) => setCompTokens(e.target.value)}
+                            placeholder="Contoh: 2"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-amber-400 placeholder:text-slate-600 outline-none focus:border-sky-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={compReason}
+                          onChange={(e) => setCompReason(e.target.value)}
+                          placeholder="Alasan / Catatan kompensasi..."
+                          className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 outline-none focus:border-sky-400"
+                        />
+                        <button
+                          type="submit"
+                          disabled={modActionLoading || (!compCash && !compTokens)}
+                          className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-mono font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
+                        >
+                          {modActionLoading ? 'Menyuntikkan...' : '🎁 Suntik Kompensasi'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Reset Progres Save */}
+                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                        Reset Progres Pemain
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">Kembalikan kas ke $100 dan hapus seluruh item.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetSave}
+                      disabled={modActionLoading}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 font-mono text-xs cursor-pointer transition-all disabled:opacity-50"
+                    >
+                      Reset ke Awal
+                    </button>
+                  </div>
+
+                  {modActionMsg && (
+                    <div className={`p-2.5 rounded-xl text-xs font-mono ${modActionMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                      {modActionMsg.text}
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end">
                     <button
                       onClick={() => {
                         setSelectedPlayer(null);
                         setAdminResetMsg(null);
                         setAdminNewPassword('');
+                        setModActionMsg(null);
+                        setBanReasonInput('');
+                        setCompCash('');
+                        setCompTokens('');
                       }}
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-bold cursor-pointer"
                     >
