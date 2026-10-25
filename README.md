@@ -94,6 +94,13 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 - **Instant Auto-Hydration**: Switching browsers, devices, or incognito windows automatically restores game progress without manual file imports.
 - **Dual-Database Branching**: Complete physical isolation between `dev` (development database branch) and `main` (production database branch) via Neon Serverless Postgres.
 
+### 🛰️ 8. Admin Ops Center & APM Telemetry (`/admin`)
+- **Visual Operations Dashboard**: Monitor the entire game platform in real time without touching the database via `/admin` (protected by `ADMIN_SECRET_KEY`).
+- **Whale Watcher & Player CRM**: Live table of all registered players, circulating cash, peak net worth, and workstation tiers.
+- **Live Risk & Leverage Monitor**: Real-time tracking of all active player positions, leverage brackets (50x, 100x, 250x), and liquidation distance.
+- **In-Memory Ring Buffer APM & Sentry Forwarder**: Built-in zero-dependency telemetry tracking runtime errors, API latencies (P50/P95), and database ping, with plug-and-play Sentry cloud integration (`SENTRY_DSN`).
+- **Live Global Trade Audit**: Real-time stream of recent realized trades, Take-Profits, and liquidations across all players.
+
 ---
 
 ## 🛠️ Technology Stack

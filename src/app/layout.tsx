@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+import TelemetryProvider from '../components/telemetry/TelemetryProvider';
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="id" suppressHydrationWarning>
@@ -30,7 +32,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         )}
       </head>
       <body>
-        {children}
+        <TelemetryProvider>
+          {children}
+        </TelemetryProvider>
         <noscript>
           <p style={{ padding: 24 }}>Aktifkan JavaScript untuk menjalankan Degen &amp; Whale.</p>
         </noscript>
