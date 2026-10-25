@@ -801,9 +801,11 @@ export default function AdminDashboard() {
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-white font-mono text-sm outline-none transition-all placeholder:text-slate-600"
                 autoFocus
               />
-              <span className="text-[10px] text-slate-500 font-mono mt-1 block">
-                Default dev key: <code className="text-emerald-400/80">dw_admin_9x7f2026_whale</code>
-              </span>
+              {process.env.NODE_ENV === 'development' && (
+                <span className="text-[10px] text-slate-500 font-mono mt-1 block">
+                  [Dev Only] Key: <code className="text-emerald-400/80">dw_admin_9x7f2026_whale</code>
+                </span>
+              )}
             </div>
 
             {authError && (
