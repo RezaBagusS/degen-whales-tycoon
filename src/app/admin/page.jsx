@@ -26,7 +26,9 @@ import {
   Server,
   Layers,
   Sparkles,
-  ChevronLeft
+  ChevronLeft,
+  Download,
+  X
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -59,7 +61,8 @@ function PaginationControl({
   limit = 10,
   onPageChange,
   onLimitChange,
-  label = 'data'
+  label = 'data',
+  disabled = false
 }) {
   if (total === 0) return null;
   const startIdx = Math.min((page - 1) * limit + 1, total);
@@ -77,8 +80,9 @@ function PaginationControl({
             <select
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
+              disabled={disabled}
               aria-label="Jumlah baris per halaman"
-              className="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-xs text-slate-300 outline-none cursor-pointer focus:border-slate-700"
+              className="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-xs text-slate-300 outline-none cursor-pointer focus:border-slate-700 disabled:opacity-50"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -93,8 +97,8 @@ function PaginationControl({
         <button
           type="button"
           onClick={() => onPageChange(1)}
-          disabled={page <= 1}
-          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs"
+          disabled={disabled || page <= 1}
+          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs transition-opacity"
           title="Halaman Pertama"
         >
           «
@@ -102,8 +106,8 @@ function PaginationControl({
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1"
+          disabled={disabled || page <= 1}
+          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1 transition-opacity"
         >
           <ChevronLeft className="w-3 h-3" />
           <span>Prev</span>
@@ -116,8 +120,8 @@ function PaginationControl({
         <button
           type="button"
           onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1"
+          disabled={disabled || page >= totalPages}
+          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1 transition-opacity"
         >
           <span>Next</span>
           <ChevronRight className="w-3 h-3" />
@@ -125,14 +129,36 @@ function PaginationControl({
         <button
           type="button"
           onClick={() => onPageChange(totalPages)}
-          disabled={page >= totalPages}
-          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs"
+          disabled={disabled || page >= totalPages}
+          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs transition-opacity"
           title="Halaman Terakhir"
         >
           »
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Reusable Table Skeleton Shimmer Loader
+ */
+function TableSkeleton({ cols = 8, rows = 5 }) {
+  return (
+    <tbody className="divide-y divide-slate-800/50 animate-pulse">
+      {Array.from({ length: rows }).map((_, rIdx) => (
+        <tr key={rIdx} className="bg-slate-900/10">
+          {Array.from({ length: cols }).map((_, cIdx) => (
+            <td key={cIdx} className="py-3 px-3">
+              <div
+                className="h-3.5 bg-slate-800/70 rounded-md"
+                style={{ width: `${60 + ((rIdx * 17 + cIdx * 23) % 35)}%` }}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
   );
 }
 
@@ -149,6 +175,7 @@ export default function AdminDashboard() {
 
   // Pagination & Filtering States
   const [searchPlayer, setSearchPlayer] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [playerStatusFilter, setPlayerStatusFilter] = useState('all'); // 'all' | 'online' | 'active24h'
   const [playersPage, setPlayersPage] = useState(1);
   const [playersLimit, setPlayersLimit] = useState(10);
@@ -255,6 +282,74 @@ export default function AdminDashboard() {
     }, autoRefreshSec * 1000);
     return () => clearInterval(interval);
   }, [isAuthenticated, autoRefreshSec, adminKey, fetchMetrics]);
+
+  // Debounced search effect (350ms) to eliminate typing glitch & excessive calls
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchInput !== searchPlayer) {
+        setSearchPlayer(searchInput);
+        setPlayersPage(1);
+        if (isAuthenticated && adminKey) {
+          fetchMetrics(adminKey, { searchPlayer: searchInput, playersPage: 1 });
+        }
+      }
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchInput, searchPlayer, isAuthenticated, adminKey, fetchMetrics]);
+
+  // Export Whale Watcher CRM to CSV
+  const exportWhalesToCSV = () => {
+    if (!data?.players?.length) return;
+    const headers = ['Peringkat', 'Username', 'Email', 'Status', 'Terakhir Aktif', 'Kas ($)', 'Peak Net Worth ($)', 'Whale Tokens', 'Total Trades', 'Sindikat'];
+    const rows = data.players.map((p, idx) => {
+      const rank = (playersPage - 1) * playersLimit + idx + 1;
+      const status = p.isOnline ? 'Online' : p.isActive24h ? 'Aktif 24 Jam' : 'Offline';
+      return [
+        rank,
+        `"${p.username}"`,
+        `"${p.email || '-'}"`,
+        `"${status}"`,
+        `"${p.lastActive ? new Date(p.lastActive).toLocaleString() : '-'}"`,
+        p.cash,
+        p.peakNetWorth,
+        p.whaleTokens,
+        p.totalTrades,
+        `"${p.syndicateTag || '-'}"`
+      ];
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encoded = encodeURI(csvContent);
+    const a = document.createElement('a');
+    a.href = encoded;
+    a.download = `degen_whales_crm_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Export Closed Trades to CSV
+  const exportTradesToCSV = () => {
+    if (!data?.recentTrades?.length) return;
+    const headers = ['Waktu', 'Username', 'Pair', 'Tipe', 'Leverage', 'Entry Price', 'Exit Price', 'PnL ($)'];
+    const rows = data.recentTrades.map((t) => [
+      `"${t.timestamp ? new Date(t.timestamp).toLocaleString() : '-'}"`,
+      `"${t.username}"`,
+      `"${t.pairSymbol || 'DEGEN/USDT'}"`,
+      `"${t.type}"`,
+      t.leverage,
+      t.entryPrice || 0,
+      t.exitPrice || 0,
+      t.pnl || 0
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encoded = encodeURI(csvContent);
+    const a = document.createElement('a');
+    a.href = encoded;
+    a.download = `degen_whales_trades_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   // Handle Login
   const handleLogin = (e) => {
@@ -414,6 +509,13 @@ export default function AdminDashboard() {
 
         {/* Controls */}
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Quick Realtime Online Pill */}
+          <div className="hidden sm:flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-white font-bold">{data?.overview?.activeUsersNow ?? 0}</span>
+            <span className="text-slate-400">Online</span>
+          </div>
+
           {/* Auto Refresh Select */}
           <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -433,7 +535,7 @@ export default function AdminDashboard() {
           <button
             onClick={() => fetchMetrics(adminKey)}
             disabled={loading}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-all active:scale-95"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-all active:scale-95 disabled:opacity-50"
             title="Refresh Sekarang"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
@@ -456,6 +558,11 @@ export default function AdminDashboard() {
           </button>
         </div>
       </header>
+
+      {/* Top Nano Progress Loading Bar */}
+      <div className={`h-0.5 w-full bg-slate-900/60 overflow-hidden relative transition-opacity duration-300 ${loading ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="h-full bg-gradient-to-r from-emerald-500 via-sky-400 to-emerald-400 animate-pulse w-full" />
+      </div>
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
@@ -614,29 +721,57 @@ export default function AdminDashboard() {
                     Realized PnL • Posisi Sudah Ditutup
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">
-                  Total Tercatat: {data?.tradesPagination?.total ?? 0} Transaksi
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Total Tercatat: {data?.tradesPagination?.total ?? 0} Transaksi
+                  </span>
+                  {data?.recentTrades?.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={exportTradesToCSV}
+                      className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                      title="Export Riwayat Transaksi ke CSV"
+                    >
+                      <Download className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Export CSV</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {(!data?.recentTrades || data.recentTrades.length === 0) ? (
-                <div className="text-center py-8 text-slate-500 font-mono text-xs">
-                  Belum ada riwayat transaksi yang tercatat di database.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
-                        <th className="py-2 px-3">Waktu</th>
-                        <th className="py-2 px-3">Pemain</th>
-                        <th className="py-2 px-3">Pair</th>
-                        <th className="py-2 px-3">Arah / Lev</th>
-                        <th className="py-2 px-3">Harga Entry / Exit</th>
-                        <th className="py-2 px-3 text-right">PnL Realized</th>
+              <div className="relative overflow-x-auto rounded-xl">
+                {loading && (
+                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                    <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center gap-2 shadow-2xl">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Memuat riwayat transaksi...</span>
+                    </div>
+                  </div>
+                )}
+
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                      <th className="py-2 px-3">Waktu</th>
+                      <th className="py-2 px-3">Pemain</th>
+                      <th className="py-2 px-3">Pair</th>
+                      <th className="py-2 px-3">Arah / Lev</th>
+                      <th className="py-2 px-3">Harga Entry / Exit</th>
+                      <th className="py-2 px-3 text-right">PnL Realized</th>
+                    </tr>
+                  </thead>
+                  {!data ? (
+                    <TableSkeleton cols={6} rows={tradesLimit} />
+                  ) : (!data.recentTrades || data.recentTrades.length === 0) ? (
+                    <tbody>
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-slate-500 font-mono text-xs">
+                          Belum ada riwayat transaksi yang tercatat di database.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    </tbody>
+                  ) : (
+                    <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                       {data.recentTrades.map((t, idx) => {
                         const isWin = (t.pnl || 0) >= 0;
                         const hasPrices = t.entryPrice && t.exitPrice && (t.entryPrice > 0 || t.exitPrice > 0);
@@ -672,9 +807,9 @@ export default function AdminDashboard() {
                         );
                       })}
                     </tbody>
-                  </table>
-                </div>
-              )}
+                  )}
+                </table>
+              </div>
 
               {/* Trades Pagination Control */}
               {data?.tradesPagination && (
@@ -683,6 +818,7 @@ export default function AdminDashboard() {
                   totalPages={data.tradesPagination.totalPages}
                   total={data.tradesPagination.total}
                   limit={tradesLimit}
+                  disabled={loading}
                   label="transaksi"
                   onPageChange={(newPage) => {
                     setTradesPage(newPage);
@@ -766,25 +902,65 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Search Input */}
+                {/* Search Input with Debounce & Clear Button */}
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={searchPlayer}
-                    onChange={(e) => {
-                      setSearchPlayer(e.target.value);
-                      setPlayersPage(1);
-                      fetchMetrics(adminKey, { searchPlayer: e.target.value, playersPage: 1 });
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchPlayer(searchInput);
+                        setPlayersPage(1);
+                        fetchMetrics(adminKey, { searchPlayer: searchInput, playersPage: 1 });
+                      }
                     }}
                     placeholder="Cari username / email..."
-                    className="pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-white outline-none focus:border-sky-500 w-full sm:w-60"
+                    className="pl-9 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-white outline-none focus:border-sky-500 w-full sm:w-60"
                   />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchInput('');
+                        setSearchPlayer('');
+                        setPlayersPage(1);
+                        fetchMetrics(adminKey, { searchPlayer: '', playersPage: 1 });
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                      title="Hapus pencarian"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
+
+                {/* Export CSV Button */}
+                {data?.players?.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={exportWhalesToCSV}
+                    className="px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    title="Export Data Pemain ke CSV"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="hidden sm:inline">Export CSV</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto rounded-xl">
+              {loading && (
+                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                  <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center gap-2 shadow-2xl">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memuat akun pemain...</span>
+                  </div>
+                </div>
+              )}
+
               <table className="w-full text-left font-mono text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
@@ -798,15 +974,19 @@ export default function AdminDashboard() {
                     <th className="py-2.5 px-3 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {(!data?.players || data.players.length === 0) ? (
+                {!data ? (
+                  <TableSkeleton cols={8} rows={playersLimit} />
+                ) : (!data.players || data.players.length === 0) ? (
+                  <tbody>
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-500">
                         Tidak ada pemain yang sesuai dengan filter.
                       </td>
                     </tr>
-                  ) : (
-                    data.players.map((player, idx) => {
+                  </tbody>
+                ) : (
+                  <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                    {data.players.map((player, idx) => {
                       const rank = (playersPage - 1) * playersLimit + idx + 1;
                       return (
                         <tr key={player.id} className="hover:bg-slate-900/50 transition-colors">
@@ -870,9 +1050,9 @@ export default function AdminDashboard() {
                           </td>
                         </tr>
                       );
-                    })
-                  )}
-                </tbody>
+                    })}
+                  </tbody>
+                )}
               </table>
             </div>
 
@@ -883,6 +1063,7 @@ export default function AdminDashboard() {
                 totalPages={data.playersPagination.totalPages}
                 total={data.playersPagination.total}
                 limit={playersLimit}
+                disabled={loading}
                 label="pemain"
                 onPageChange={(newPage) => {
                   setPlayersPage(newPage);
@@ -1042,25 +1223,62 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {(!data?.activePositions || data.activePositions.length === 0) ? (
-              <div className="text-center py-12 text-slate-500 font-mono text-xs">
-                Tidak ada posisi trading yang sedang aktif saat ini.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
-                      <th className="py-2.5 px-3">Pemain</th>
-                      <th className="py-2.5 px-3">Pair Asset</th>
-                      <th className="py-2.5 px-3">Arah &amp; Leverage</th>
-                      <th className="py-2.5 px-3 text-right">Margin</th>
-                      <th className="py-2.5 px-3 text-right">Total Notional</th>
-                      <th className="py-2.5 px-3 text-right">Harga Entry</th>
-                      <th className="py-2.5 px-3 text-right">Harga Likuidasi</th>
+            {/* Long vs Short Market Sentiment Ratio */}
+            {data?.activePositions && data.activePositions.length > 0 && (() => {
+              const longCount = data.activePositions.filter(p => p.type === 'LONG').length;
+              const shortCount = data.activePositions.filter(p => p.type === 'SHORT').length;
+              const total = longCount + shortCount;
+              const longPct = total > 0 ? Math.round((longCount / total) * 100) : 50;
+              const shortPct = 100 - longPct;
+              return (
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1.5 font-mono text-xs">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[#00FF88] font-bold">🟢 LONG: {longCount} ({longPct}%)</span>
+                    <span className="text-slate-400 font-semibold">Sentimen Leverage Pasar</span>
+                    <span className="text-rose-400 font-bold">🔴 SHORT: {shortCount} ({shortPct}%)</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                    <div className="bg-[#00FF88] h-full transition-all duration-500" style={{ width: `${longPct}%` }} />
+                    <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${shortPct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="relative overflow-x-auto rounded-xl">
+              {loading && (
+                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                  <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center gap-2 shadow-2xl">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memuat posisi leverage...</span>
+                  </div>
+                </div>
+              )}
+
+              <table className="w-full text-left font-mono text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th className="py-2.5 px-3">Pemain</th>
+                    <th className="py-2.5 px-3">Pair Asset</th>
+                    <th className="py-2.5 px-3">Arah &amp; Leverage</th>
+                    <th className="py-2.5 px-3 text-right">Margin</th>
+                    <th className="py-2.5 px-3 text-right">Total Notional</th>
+                    <th className="py-2.5 px-3 text-right">Harga Entry</th>
+                    <th className="py-2.5 px-3 text-right">Harga Likuidasi</th>
+                  </tr>
+                </thead>
+                {!data ? (
+                  <TableSkeleton cols={7} rows={positionsLimit} />
+                ) : (!data.activePositions || data.activePositions.length === 0) ? (
+                  <tbody>
+                    <tr>
+                      <td colSpan={7} className="text-center py-12 text-slate-500 font-mono text-xs">
+                        Tidak ada posisi trading yang sedang aktif saat ini.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  </tbody>
+                ) : (
+                  <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                     {data.activePositions.map((pos) => {
                       const notional = pos.margin * pos.leverage;
                       const isHighLeverage = pos.leverage >= 50;
@@ -1102,9 +1320,9 @@ export default function AdminDashboard() {
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
-            )}
+                )}
+              </table>
+            </div>
 
             {/* Positions Pagination Control */}
             {data?.positionsPagination && (
@@ -1113,6 +1331,7 @@ export default function AdminDashboard() {
                 totalPages={data.positionsPagination.totalPages}
                 total={data.positionsPagination.total}
                 limit={positionsLimit}
+                disabled={loading}
                 label="posisi"
                 onPageChange={(newPage) => {
                   setPositionsPage(newPage);
@@ -1213,6 +1432,7 @@ export default function AdminDashboard() {
                     totalPages={totalApmPages}
                     total={totalApmErrors}
                     limit={apmLimit}
+                    disabled={loading}
                     label="log error"
                     onPageChange={(newPage) => setApmPage(newPage)}
                     onLimitChange={(newLimit) => {
