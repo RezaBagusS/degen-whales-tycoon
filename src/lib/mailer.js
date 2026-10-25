@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
 export function getTransporter() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT) || 465;
-  const user = process.env.SMTP_USER || 'rezabagussapurait@gmail.com';
+  const user = process.env.SMTP_USER || 'rezabagussaputrait@gmail.com';
   const pass = process.env.SMTP_PASS || '';
 
   return {
