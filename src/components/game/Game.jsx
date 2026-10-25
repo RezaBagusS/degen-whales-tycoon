@@ -671,9 +671,9 @@ const MARKET_PAIRS = [
   { symbol: 'LINK/USDT', name: 'Chainlink', basePrice: 11.80, vol: 0.00030, category: 'top', precision: 2, marketType: 'crypto_real', liveTicker: 'LINKUSDT' }
 ];
 
-// Precision for trading pairs:
-// - degen_perps: strictly 2 decimal places ($420.69, $1250.00, $69420.00)
-// - crypto_real: follows real live market data precision (DOGE = 4 decimals, BTC/ETH/SOL/BNB/AVAX/LINK = 2 decimals)
+// Binance-Style Price Precision System:
+// - Title/Header/Tickers: standard ticker precision (2 decimals for SOL/BTC/ETH/degen, 4 for DOGE)
+// - Chart Price Y-Axis: Binance standard 4 decimal places (e.g. SOLUSDT: $100.68 in title, $100.6800 on Y-chart)
 export const getPairPrecision = (pairOrSymbol, price = null) => {
   let pair = null;
   if (typeof pairOrSymbol === 'string') {
@@ -691,13 +691,27 @@ export const getPairPrecision = (pairOrSymbol, price = null) => {
   return 2;
 };
 
-// Dynamic chart price axis precision
-export const getDynamicAxisPrecision = (priceRange, basePrecision = 2) => {
-  if (!priceRange || priceRange <= 0) return basePrecision;
+// Binance Price Y-Chart Precision (4 decimal places for crypto / standard pairs, 5+ for micro-cent assets)
+export const getChartPrecision = (pairOrSymbol, price = null) => {
+  let pair = null;
+  if (typeof pairOrSymbol === 'string') {
+    pair = MARKET_PAIRS.find((p) => p.symbol === pairOrSymbol);
+  } else if (pairOrSymbol && typeof pairOrSymbol === 'object') {
+    pair = pairOrSymbol;
+  }
+  const checkPrice = price !== null && !isNaN(price) ? Math.abs(price) : (pair?.basePrice || 100);
+  if (checkPrice < 1) return 5;
+  return 4; // Binance chart price standard: 4 decimal places on Y-axis and OHLC
+};
+
+// Dynamic chart price axis precision ensuring at least 4 decimal places on Y chart
+export const getDynamicAxisPrecision = (priceRange, basePrecision = 4) => {
+  const base = Math.max(4, basePrecision);
+  if (!priceRange || priceRange <= 0) return base;
   const step = priceRange / 6;
-  if (step < 0.002) return Math.max(basePrecision, 4);
-  if (step < 0.02) return Math.max(basePrecision, 3);
-  return basePrecision;
+  if (step < 0.0002) return Math.max(base, 6);
+  if (step < 0.002) return Math.max(base, 5);
+  return base;
 };
 
 export const formatPairPrice = (price, decimals = null) => {
@@ -3165,7 +3179,7 @@ function TradingGame() {
 
   const displayCandle = useMemo(() => {
     if (!activeCandles || activeCandles.length === 0) return null;
-    const chartWidth = canvasSize.width > 80 ? canvasSize.width - 80 : 600;
+    const chartWidth = canvasSize.width > 92 ? canvasSize.width - 92 : 600;
     const baseCandles = Math.max(45, Math.min(140, Math.round(chartWidth / 11)));
     const targetCandleCount = Math.max(12, Math.min(activeCandles.length, Math.round(baseCandles / chartXZoom)));
     const slotWidth = chartWidth / targetCandleCount;
@@ -3175,7 +3189,7 @@ function TradingGame() {
 
     if (mousePos.x !== null && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const actualChartWidth = rect.width - 80;
+      const actualChartWidth = rect.width - 92;
       if (mousePos.x <= actualChartWidth && mousePos.x >= 0) {
         const candleOffsetFromLast = (mousePos.x - lastCandleBaseX) / slotWidth;
         const hoveredIdx = Math.round(lastIdx + candleOffsetFromLast);
@@ -3227,7 +3241,8 @@ function TradingGame() {
 
     const activePairConfig = MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0];
     const pairBasePrecision = getPairPrecision(activePairConfig, currentPrice);
-    const rightAxisWidth = pairBasePrecision >= 4 ? 88 : 80;
+    const chartBasePrecision = getChartPrecision(activePairConfig, currentPrice);
+    const rightAxisWidth = 92;
     const initialChartWidth = Math.max(200, width - rightAxisWidth);
     const chartWidth = width - rightAxisWidth;
     const bottomAxisHeight = 24;
@@ -3318,7 +3333,7 @@ function TradingGame() {
     const minPrice = Math.max(0.0001, centerPrice - scaledSpan / 2 - pricePadding);
     const maxPrice = centerPrice + scaledSpan / 2 + pricePadding;
     const priceRange = maxPrice - minPrice;
-    const dynamicPrecision = getDynamicAxisPrecision(priceRange, pairBasePrecision);
+    const dynamicPrecision = getDynamicAxisPrecision(priceRange, chartBasePrecision);
 
     const toY = (price) => chartHeight - ((price - minPrice) / (priceRange || 1)) * (chartHeight - 30) - 15;
     const toPrice = (y) => maxPrice - ((y - 15) / (chartHeight - 30)) * priceRange;
@@ -3572,7 +3587,7 @@ function TradingGame() {
         ctx.setLineDash([]);
 
         // Sleek concise text: if ENTRY, display live running PnL. If TP/SL, display target dollar outcome.
-        let tagText = `${label} ${formatPairPrice(price, pairBasePrecision)}`;
+        let tagText = `${label} ${formatPairPrice(price, dynamicPrecision)}`;
         let pillColor = color;
 
         if (label === 'ENTRY') {
@@ -3583,7 +3598,7 @@ function TradingGame() {
           const pnlSign = pnl >= 0 ? '+' : '-';
           const pnlStr = `${pnlSign}${formatMoney(Math.abs(pnl))}`;
           const roiStr = `${pnlSign}${Math.abs(roi).toFixed(1)}%`;
-          tagText = `${pos.type} ${pos.leverage}x ENTRY ${formatPairPrice(price, pairBasePrecision)} (${pnlStr} / ${roiStr})`;
+          tagText = `${pos.type} ${pos.leverage}x ENTRY ${formatPairPrice(price, dynamicPrecision)} (${pnlStr} / ${roiStr})`;
           pillColor = pnl >= 0 ? '#10B981' : '#F43F5E';
         } else if (isBeingDragged) {
           const isLong = pos.type === 'LONG';
@@ -3591,7 +3606,7 @@ function TradingGame() {
           const estRoi = (diff / pos.entryPrice) * pos.leverage * 100;
           const estDollar = pos.margin * (estRoi / 100);
           const estStr = estDollar >= 0 ? `+${formatMoney(estDollar)}` : `-${formatMoney(Math.abs(estDollar))}`;
-          tagText = `${label} ${formatPairPrice(price, pairBasePrecision)} (${estStr})`;
+          tagText = `${label} ${formatPairPrice(price, dynamicPrecision)} (${estStr})`;
           pillColor = '#FFFFFF';
         } else if (isAdjustable) {
           const isLong = pos.type === 'LONG';
@@ -3599,7 +3614,7 @@ function TradingGame() {
           const estRoi = (diff / pos.entryPrice) * pos.leverage * 100;
           const estDollar = pos.margin * (estRoi / 100);
           const estStr = estDollar >= 0 ? `+${formatMoney(estDollar)}` : `-${formatMoney(Math.abs(estDollar))}`;
-          tagText = `${label} ${formatPairPrice(price, pairBasePrecision)} (${estStr}) ⇅`;
+          tagText = `${label} ${formatPairPrice(price, dynamicPrecision)} (${estStr}) ⇅`;
         }
 
         ctx.font = 'bold 9px monospace';
@@ -3623,7 +3638,7 @@ function TradingGame() {
           const sl = pos.slPrice;
           let slColor = '#F59E0B';
           let slLabel = 'SL';
-          if (Math.abs(sl - entry) <= (1 / Math.pow(10, pairBasePrecision))) {
+          if (Math.abs(sl - entry) <= (1 / Math.pow(10, dynamicPrecision))) {
             slColor = '#38BDF8';
             slLabel = 'SL BEP';
           } else if (isLong ? sl > entry : sl < entry) {
@@ -3636,7 +3651,7 @@ function TradingGame() {
         // Off-screen Liquidation Navigator Pill (TradingView-style off-chart alert)
         if (pos.liqPrice > maxPrice) {
           const distPct = (((pos.liqPrice - currentPrice) / currentPrice) * 100).toFixed(1);
-          const liqText = `▲ LIQ: ${formatPairPrice(pos.liqPrice, pairBasePrecision)} (+${distPct}%)`;
+          const liqText = `▲ LIQ: ${formatPairPrice(pos.liqPrice, dynamicPrecision)} (+${distPct}%)`;
           ctx.font = 'bold 9.5px monospace';
           const pillW = ctx.measureText(liqText).width + 16;
           drawPill(chartWidth - pillW - 10, 14, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
@@ -3644,7 +3659,7 @@ function TradingGame() {
           ctx.fillText(liqText, chartWidth - pillW - 2, 27.5);
         } else if (pos.liqPrice < minPrice) {
           const distPct = (((currentPrice - pos.liqPrice) / currentPrice) * 100).toFixed(1);
-          const liqText = `▼ LIQ: ${formatPairPrice(pos.liqPrice, pairBasePrecision)} (-${distPct}%)`;
+          const liqText = `▼ LIQ: ${formatPairPrice(pos.liqPrice, dynamicPrecision)} (-${distPct}%)`;
           ctx.font = 'bold 9.5px monospace';
           const pillW = ctx.measureText(liqText).width + 16;
           drawPill(chartWidth - pillW - 10, chartHeight - 26, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
@@ -3654,14 +3669,14 @@ function TradingGame() {
 
         // Off-screen TP/SL Navigator Pills if outside view
         if (pos.tpPrice && pos.tpPrice > maxPrice) {
-          const tpText = `▲ TP: ${formatPairPrice(pos.tpPrice, pairBasePrecision)}`;
+          const tpText = `▲ TP: ${formatPairPrice(pos.tpPrice, dynamicPrecision)}`;
           ctx.font = 'bold 9px monospace';
           const pillW = ctx.measureText(tpText).width + 12;
           drawPill(chartWidth - pillW - 10, 38, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
           ctx.fillStyle = '#34D399';
           ctx.fillText(tpText, chartWidth - pillW - 4, 50.5);
         } else if (pos.tpPrice && pos.tpPrice < minPrice) {
-          const tpText = `▼ TP: ${formatPairPrice(pos.tpPrice, pairBasePrecision)}`;
+          const tpText = `▼ TP: ${formatPairPrice(pos.tpPrice, dynamicPrecision)}`;
           ctx.font = 'bold 9px monospace';
           const pillW = ctx.measureText(tpText).width + 12;
           drawPill(chartWidth - pillW - 10, chartHeight - 48, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
@@ -3670,14 +3685,14 @@ function TradingGame() {
         }
 
         if (pos.slPrice && pos.slPrice > maxPrice) {
-          const slText = `▲ SL: ${formatPairPrice(pos.slPrice, pairBasePrecision)}`;
+          const slText = `▲ SL: ${formatPairPrice(pos.slPrice, dynamicPrecision)}`;
           ctx.font = 'bold 9px monospace';
           const pillW = ctx.measureText(slText).width + 12;
           drawPill(chartWidth - pillW - 10, 60, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
           ctx.fillStyle = '#FBBF24';
           ctx.fillText(slText, chartWidth - pillW - 4, 72.5);
         } else if (pos.slPrice && pos.slPrice < minPrice) {
-          const slText = `▼ SL: ${formatPairPrice(pos.slPrice, pairBasePrecision)}`;
+          const slText = `▼ SL: ${formatPairPrice(pos.slPrice, dynamicPrecision)}`;
           ctx.font = 'bold 9px monospace';
           const pillW = ctx.measureText(slText).width + 12;
           drawPill(chartWidth - pillW - 10, chartHeight - 70, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
@@ -6486,13 +6501,13 @@ function TradingGame() {
                 {displayCandle && (
                   <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-700/80 text-[9px] sm:text-[10px] font-mono shadow-md">
                     {(() => {
-                      const curPairPrec = getPairPrecision(MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0], currentPrice);
+                      const curChartPrec = getChartPrecision(MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0], currentPrice);
                       return (
                         <>
-                          <span className="text-slate-400">O: <span className="text-white font-bold">{formatPairPrice(displayCandle.open, curPairPrec)}</span></span>
-                          <span className="text-slate-400">H: <span className="text-white font-bold">{formatPairPrice(displayCandle.high, curPairPrec)}</span></span>
-                          <span className="text-slate-400">L: <span className="text-white font-bold">{formatPairPrice(displayCandle.low, curPairPrec)}</span></span>
-                          <span className="text-slate-400">C: <span className={`font-bold ${displayCandle.close >= displayCandle.open ? 'text-[#00FF88]' : 'text-[#FF3366]'}`}>{formatPairPrice(displayCandle.close, curPairPrec)}</span></span>
+                          <span className="text-slate-400">O: <span className="text-white font-bold">{formatPairPrice(displayCandle.open, curChartPrec)}</span></span>
+                          <span className="text-slate-400">H: <span className="text-white font-bold">{formatPairPrice(displayCandle.high, curChartPrec)}</span></span>
+                          <span className="text-slate-400">L: <span className="text-white font-bold">{formatPairPrice(displayCandle.low, curChartPrec)}</span></span>
+                          <span className="text-slate-400">C: <span className={`font-bold ${displayCandle.close >= displayCandle.open ? 'text-[#00FF88]' : 'text-[#FF3366]'}`}>{formatPairPrice(displayCandle.close, curChartPrec)}</span></span>
                         </>
                       );
                     })()}
