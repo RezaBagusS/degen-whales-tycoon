@@ -11,6 +11,13 @@ const Game = dynamic(() => import('./game/Game'), {
   loading: () => <GameLoading />,
 });
 
+import MonetagVignette from './ads/MonetagVignette';
+
 export default function GameClient() {
-  return <Game />;
+  return (
+    <>
+      <MonetagVignette />
+      <Game />
+    </>
+  );
 }
