@@ -9,6 +9,7 @@ generator client {
 model User {
   id            String       @id @default(uuid())
   username      String       @unique
+  email         String?
   passwordHash  String?
   walletAddress String?      @unique
   createdAt     DateTime     @default(now())
@@ -19,6 +20,7 @@ model User {
   syndicate     Syndicate?   @relation(fields: [syndicateId], references: [id])
 
   @@index([username])
+  @@index([email])
 }
 
 model GameSave {
@@ -54,4 +56,14 @@ model Syndicate {
   members          User[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, code])
 }

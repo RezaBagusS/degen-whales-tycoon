@@ -58,6 +58,9 @@ export default function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [searchPlayer, setSearchPlayer] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminResetLoading, setAdminResetLoading] = useState(false);
+  const [adminResetMsg, setAdminResetMsg] = useState(null);
   const [, startTransition] = useTransition();
 
   // Load saved admin key from sessionStorage on mount
@@ -134,6 +137,42 @@ export default function AdminDashboard() {
     setAdminKey('');
     setIsAuthenticated(false);
     setData(null);
+  };
+
+  const handleAdminResetPassword = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedPlayer || !adminNewPassword) return;
+    if (adminNewPassword.length < 6) {
+      setAdminResetMsg({ type: 'error', text: 'Password baru minimal 6 karakter.' });
+      return;
+    }
+
+    setAdminResetLoading(true);
+    setAdminResetMsg(null);
+    try {
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        },
+        body: JSON.stringify({
+          userId: selectedPlayer.id,
+          newPassword: adminNewPassword
+        })
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setAdminResetMsg({ type: 'error', text: resData.error || 'Gagal mereset password pemain.' });
+      } else {
+        setAdminResetMsg({ type: 'success', text: `✓ Password untuk @${selectedPlayer.username} berhasil direset!` });
+        setAdminNewPassword('');
+      }
+    } catch {
+      setAdminResetMsg({ type: 'error', text: 'Kesalahan jaringan saat menghubungi server.' });
+    } finally {
+      setAdminResetLoading(false);
+    }
   };
 
   // If not authenticated, render Login Gate
@@ -694,9 +733,52 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  {/* Admin Reset Password Section */}
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5" />
+                        Admin Reset Password Pemain
+                      </span>
+                      {selectedPlayer.email && (
+                        <span className="text-[10px] font-mono text-slate-400">Email: {selectedPlayer.email}</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-tight">
+                      Ganti langsung password akun @{selectedPlayer.username} jika pemain lupa password atau meminta bantuan melalui support.
+                    </p>
+
+                    {adminResetMsg && (
+                      <div className={`p-2 rounded-lg text-xs font-mono ${adminResetMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                        {adminResetMsg.text}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAdminResetPassword} className="flex items-center gap-2 pt-1">
+                      <input
+                        type="password"
+                        placeholder="Ketik password baru (min. 6 karakter)"
+                        value={adminNewPassword}
+                        onChange={(e) => setAdminNewPassword(e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={adminResetLoading || !adminNewPassword}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
+                      >
+                        {adminResetLoading ? 'Mereset...' : 'Reset Sekarang'}
+                      </button>
+                    </form>
+                  </div>
+
                   <div className="pt-2 flex justify-end">
                     <button
-                      onClick={() => setSelectedPlayer(null)}
+                      onClick={() => {
+                        setSelectedPlayer(null);
+                        setAdminResetMsg(null);
+                        setAdminNewPassword('');
+                      }}
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-bold cursor-pointer"
                     >
                       Tutup

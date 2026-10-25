@@ -5,7 +5,7 @@ import { hashPassword, createSessionToken, COOKIE_NAME } from '../../../../lib/a
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { username, password, localSaveState } = body;
+    const { username, password, email, localSaveState } = body;
 
     // Validation
     if (!username || typeof username !== 'string') {
@@ -22,6 +22,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Password minimal 6 karakter' }, { status: 400 });
     }
 
+    let cleanEmail = null;
+    if (email && typeof email === 'string' && email.trim()) {
+      cleanEmail = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
+      }
+    }
+
     // Check existing
     const existing = await prisma.user.findUnique({
       where: { username: cleanUsername }
@@ -35,7 +43,8 @@ export async function POST(request) {
     const user = await prisma.user.create({
       data: {
         username: cleanUsername,
-        passwordHash
+        passwordHash,
+        email: cleanEmail
       }
     });
 

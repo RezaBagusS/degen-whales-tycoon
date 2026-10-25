@@ -44,6 +44,7 @@ import {
   ArrowDownRight,
   Layers,
   Lock,
+  Mail,
   Copy,
   Download,
   Terminal,
@@ -1386,6 +1387,19 @@ function TradingGame() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
+  // Password & Email Settings States
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changePassOld, setChangePassOld] = useState('');
+  const [changePassNew, setChangePassNew] = useState('');
+  const [changePassConfirm, setChangePassConfirm] = useState('');
+  const [changePassLoading, setChangePassLoading] = useState(false);
+  const [changePassMsg, setChangePassMsg] = useState(null);
+
+  const [showUpdateEmail, setShowUpdateEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [updateEmailLoading, setUpdateEmailLoading] = useState(false);
+  const [updateEmailMsg, setUpdateEmailMsg] = useState(null);
+
   // Feature 1: Black Market Inventory & Power-Up States
   const [inventory, setInventory] = useState(initial.inventory || {
     pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0
@@ -1823,6 +1837,76 @@ function TradingGame() {
       triggerToast('Berhasil keluar dari akun.', 'info');
     }
   }, [currentUser, triggerToast]);
+
+  const handleChangePassword = useCallback(async (e) => {
+    if (e) e.preventDefault();
+    setChangePassMsg(null);
+    if (!changePassOld) {
+      setChangePassMsg({ type: 'error', text: 'Password lama wajib diisi.' });
+      return;
+    }
+    if (!changePassNew || changePassNew.length < 6) {
+      setChangePassMsg({ type: 'error', text: 'Password baru minimal 6 karakter.' });
+      return;
+    }
+    if (changePassNew !== changePassConfirm) {
+      setChangePassMsg({ type: 'error', text: 'Konfirmasi password baru tidak cocok.' });
+      return;
+    }
+
+    setChangePassLoading(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword: changePassOld, newPassword: changePassNew })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChangePassMsg({ type: 'error', text: data.error || 'Gagal mengubah password.' });
+      } else {
+        setChangePassMsg({ type: 'success', text: data.message || 'Password berhasil diperbarui!' });
+        setChangePassOld('');
+        setChangePassNew('');
+        setChangePassConfirm('');
+        setTimeout(() => setShowChangePassword(false), 2500);
+      }
+    } catch {
+      setChangePassMsg({ type: 'error', text: 'Terjadi kesalahan jaringan saat ganti password.' });
+    } finally {
+      setChangePassLoading(false);
+    }
+  }, [changePassOld, changePassNew, changePassConfirm]);
+
+  const handleUpdateEmail = useCallback(async (e) => {
+    if (e) e.preventDefault();
+    setUpdateEmailMsg(null);
+    if (!emailInput || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setUpdateEmailMsg({ type: 'error', text: 'Format email tidak valid.' });
+      return;
+    }
+
+    setUpdateEmailLoading(true);
+    try {
+      const res = await fetch('/api/auth/update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUpdateEmailMsg({ type: 'error', text: data.error || 'Gagal menyimpan email.' });
+      } else {
+        setUpdateEmailMsg({ type: 'success', text: 'Email pemulihan akun berhasil disimpan!' });
+        setCurrentUser((prev) => prev ? { ...prev, email: data.email } : prev);
+        setTimeout(() => setShowUpdateEmail(false), 2000);
+      }
+    } catch {
+      setUpdateEmailMsg({ type: 'error', text: 'Terjadi kesalahan jaringan.' });
+    } finally {
+      setUpdateEmailLoading(false);
+    }
+  }, [emailInput]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -7757,6 +7841,119 @@ function TradingGame() {
                       <LogOut className="w-3 h-3" />
                       <span>{language === 'en' ? 'Log Out' : 'Keluar Akun'}</span>
                     </button>
+                  </div>
+
+                  {/* Security & Password Settings */}
+                  <div className="pt-2 border-t border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowChangePassword(!showChangePassword);
+                          setChangePassMsg(null);
+                        }}
+                        className="text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Lock className="w-3 h-3" />
+                        <span>{showChangePassword ? '✕ Tutup Ganti Password' : '🔑 Ganti Password'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUpdateEmail(!showUpdateEmail);
+                          if (!emailInput && currentUser?.email) setEmailInput(currentUser.email);
+                          setUpdateEmailMsg(null);
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer font-medium"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span>{currentUser?.email ? 'Ubah Email' : '+ Tautkan Email'}</span>
+                      </button>
+                    </div>
+
+                    {/* Change Password Form */}
+                    {showChangePassword && (
+                      <form onSubmit={handleChangePassword} className="p-2.5 rounded-lg bg-slate-900 border border-amber-500/30 space-y-2 animate-in fade-in duration-150">
+                        <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Ganti Password Akun</span>
+                        </div>
+
+                        {changePassMsg && (
+                          <div className={`p-2 rounded text-[10px] ${changePassMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                            {changePassMsg.text}
+                          </div>
+                        )}
+
+                        <input
+                          type="password"
+                          placeholder="Password Lama"
+                          value={changePassOld}
+                          onChange={(e) => setChangePassOld(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Password Baru (min. 6 karakter)"
+                          value={changePassNew}
+                          onChange={(e) => setChangePassNew(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Konfirmasi Password Baru"
+                          value={changePassConfirm}
+                          onChange={(e) => setChangePassConfirm(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+
+                        <button
+                          type="submit"
+                          disabled={changePassLoading}
+                          className="w-full py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all"
+                        >
+                          {changePassLoading ? 'Menyimpan...' : 'Simpan Password Baru'}
+                        </button>
+                      </form>
+                    )}
+
+                    {/* Email Recovery Form */}
+                    {showUpdateEmail && (
+                      <form onSubmit={handleUpdateEmail} className="p-2.5 rounded-lg bg-slate-900 border border-cyan-500/30 space-y-2 animate-in fade-in duration-150">
+                        <div className="text-[11px] font-bold text-cyan-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            Email Pemulihan Akun
+                          </span>
+                          {currentUser?.email && (
+                            <span className="text-[10px] text-slate-400 font-mono">{currentUser.email}</span>
+                          )}
+                        </div>
+
+                        {updateEmailMsg && (
+                          <div className={`p-2 rounded text-[10px] ${updateEmailMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                            {updateEmailMsg.text}
+                          </div>
+                        )}
+
+                        <input
+                          type="email"
+                          placeholder="contoh: nama@gmail.com"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+
+                        <button
+                          type="submit"
+                          disabled={updateEmailLoading}
+                          className="w-full py-1.5 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all"
+                        >
+                          {updateEmailLoading ? 'Menyimpan...' : 'Simpan Email Pemulihan'}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
               ) : (

@@ -31,6 +31,7 @@ export async function GET(request) {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email || null,
         syndicate: user.syndicate
       },
       save: user.save?.savePayload || user.save
