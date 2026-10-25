@@ -48,7 +48,7 @@ test.describe('Ads Isolation Verification', () => {
     await expect(page.locator('#monetag-onclick-script')).toHaveCount(0);
   });
 
-  test('Monetag Vignette is NOT loaded when OnClick is active to prevent pair click spam', async ({ page }) => {
+  test('Monetag Vignette is completely removed and never loaded', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#monetag-vignette-script')).toHaveCount(0);
     const scripts = await page.$$eval('script', (elements) => elements.map((el) => el.src));
