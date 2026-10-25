@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
