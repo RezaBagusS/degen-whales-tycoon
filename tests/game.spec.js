@@ -8,7 +8,11 @@ const cashValue = async page => Number((await page.getByTestId('cash').innerText
 async function start(page, overrides = {}, legacy = false) {
   await page.addInitScript(({ key, overrides }) => {
     // Neutral market makes regressions deterministic, not luck-dependent.
-    Math.random = () => 0.5;
+    let callSeq = 0;
+    Math.random = () => ({
+      valueOf: () => 0.5,
+      toString: (radix) => (0.5 + (++callSeq) * 1e-6).toString(radix)
+    });
     if (!sessionStorage.getItem('seeded')) {
       localStorage.clear();
       localStorage.setItem(key, JSON.stringify({

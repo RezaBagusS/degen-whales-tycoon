@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/PLAY_NOW-degen--whales--tycoon.vercel.app-00FF88?style=for-the-badge&logo=vercel&logoColor=black)](https://degen-whales-tycoon.vercel.app)
-[![Version](https://img.shields.io/badge/version-1.4.1_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
+[![Version](https://img.shields.io/badge/version-1.5.0_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
 [![License](https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js_16-Turbopack-white?style=for-the-badge&logo=next.js&logoColor=black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React_19-Client_Engine-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -29,7 +29,19 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 
 ## ⚡ Key Features
 
-### 📈 1. Real-Time High-Octane Trading Terminal
+### 🚀 1. Multi-Position Trading Engine (NEW v1.5.0)
+- **Up to 5 Concurrent Positions**: Trade simultaneously across multiple cryptocurrency pairs without locking your order execution form (`Slot Posisi: X/5`).
+- **Persistent Order Execution Form**: Place new LONG or SHORT orders at any time using available cash while existing positions continue to run in the background.
+- **Dedicated Open Positions Dashboard**:
+  - Live individual card metrics: Direction, leverage, pair symbol, margin, total size, liquidation price, distance percentage, and real-time PnL ($ and %).
+  - **Pure Price ROI Badge**: Clear separation between pure price action returns and leveraged collateral ROI.
+  - **One-Click Chart Switch (`Buka Chart`)**: Quick jump to focus the candlestick chart on any active position's trading pair.
+  - **Quick TP/SL Modal Trigger**: Adjust Take-Profit and Stop-Loss on any active position on the fly.
+  - **One-Click Emergency Close All (`Tutup Semua Posisi`)**: Bulk-close all open positions simultaneously when 2 or more positions are running, returning aggregated collateral and profits into wallet cash.
+- **Multi-Position Canvas Overlay**: Simultaneous rendering of Entry, Liquidation, TP, and SL lines for all active positions on the currently viewed pair with off-screen navigator pills and price axis indicators.
+- **Independent Tick Evaluation**: Every open position monitors its respective pair in real time with individual trigger logic for Take Profit, Stop Loss, and Liquidation.
+
+### 📈 2. Real-Time High-Octane Trading Terminal
 - **Living Candlestick Canvas Engine**: High-performance HTML5 2D canvas chart with smooth real-time price action and multi-timeframe aggregation (`5s`, `15s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`).
 - **TradingView-Style Margins & 400 Minimum Candles**: Right-side breathing room margin (6 offset bars) for forward price projection. Every timeframe maintains at least 400 historical candles from initial session load so long-term indicators (EMA 200, EMA 50, EMA 20) calculate and render immediately.
 - **Pro Risk Management & Advanced SL (BEP & SL+)**: Drag-and-drop Take-Profit (TP) and Stop-Loss (SL) lines directly on canvas. Supports setting SL at entry (Break-Even Point / BEP) or past entry (SL+ Lock Profit) with color-coded chart tags (Orange for standard SL, Sky Blue for BEP, Emerald Green for SL+).

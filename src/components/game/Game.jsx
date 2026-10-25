@@ -926,7 +926,7 @@ const finiteNonnegative = (n, fallback = 0) =>
 function loadGame() {
   const fresh = {
     cash: 10, peakNetWorth: 10, whaleTokens: 0, passiveLevels: emptyLevels(),
-    activePosition: null, tradeHistory: [], cashLogs: [], lastDailyClaim: 0,
+    activePositions: [], activePosition: null, tradeHistory: [], cashLogs: [], lastDailyClaim: 0,
     lastWhaleFaucetClaim: 0,
     lastCashAdClaim: 0,
     selectedPairIdx: 0, selectedTfIdx: 0,
@@ -964,13 +964,30 @@ function loadGame() {
       Math.max(0.00001, finiteNonnegative(saved.marketPrices?.[i], p.basePrice)));
     let pairIdx = Number.isInteger(saved.selectedPairIdx) &&
       MARKET_PAIRS[saved.selectedPairIdx] ? saved.selectedPairIdx : 0;
-    const pos = saved.activePosition;
-    const posPair = MARKET_PAIRS.findIndex(p => p.symbol === pos?.pairSymbol);
-    const validPos = pos && posPair >= 0 && ['LONG', 'SHORT'].includes(pos.type)
-      && [2, 10, 50, 100].includes(pos.leverage)
-      && Number.isFinite(pos.margin) && pos.margin > 0
-      && Number.isFinite(pos.entryPrice) && pos.entryPrice > 0
-      && Number.isFinite(pos.liqPrice) && pos.liqPrice > 0;
+    const validatePos = (pos) => {
+      if (!pos || typeof pos !== 'object') return null;
+      const posPair = MARKET_PAIRS.findIndex(p => p.symbol === pos?.pairSymbol);
+      if (posPair < 0 || !['LONG', 'SHORT'].includes(pos.type)) return null;
+      if (![2, 10, 50, 100, 250].includes(pos.leverage)) return null;
+      if (!Number.isFinite(pos.margin) || pos.margin <= 0) return null;
+      if (!Number.isFinite(pos.entryPrice) || pos.entryPrice <= 0) return null;
+      if (!Number.isFinite(pos.liqPrice) || pos.liqPrice <= 0) return null;
+      return {
+        ...pos,
+        id: pos.id || makeId(),
+        tpPrice: finiteNonnegative(pos.tpPrice) || null,
+        slPrice: finiteNonnegative(pos.slPrice) || null,
+        openedAt: finiteNonnegative(pos.openedAt, Date.now())
+      };
+    };
+
+    let parsedPositions = [];
+    if (Array.isArray(saved.activePositions)) {
+      parsedPositions = saved.activePositions.map(validatePos).filter(Boolean);
+    } else if (saved.activePosition) {
+      const single = validatePos(saved.activePosition);
+      if (single) parsedPositions = [single];
+    }
     const parseCandlesticks = (raw) => {
       if (!raw || typeof raw !== 'object') return {};
       const result = {};
@@ -1066,12 +1083,8 @@ function loadGame() {
         ? saved.selectedTfIdx : 0,
       marketPrices: prices,
       candlesticksByTf: savedCandles,
-      activePosition: validPos ? {
-        ...pos, id: pos.id || makeId(),
-        tpPrice: finiteNonnegative(pos.tpPrice) || null,
-        slPrice: finiteNonnegative(pos.slPrice) || null,
-        openedAt: finiteNonnegative(pos.openedAt, Date.now())
-      } : null,
+      activePositions: parsedPositions,
+      activePosition: parsedPositions.length > 0 ? parsedPositions[0] : null,
       bullRunLeft: Math.max(0, finiteNonnegative(saved.bullRunLeft) - seconds),
       bearMarketLeft: Math.max(0, finiteNonnegative(saved.bearMarketLeft) - seconds),
       // Resume an unresolved alert instead of allowing refresh to erase it.
@@ -1305,7 +1318,33 @@ function TradingGame() {
   const [adjustSlInput, setAdjustSlInput] = useState('');
   const [adjustError, setAdjustError] = useState('');
 
-  const [activePosition, setActivePosition] = useState(initial.activePosition);
+  const [activePositions, setActivePositions] = useState(() => {
+    if (Array.isArray(initial.activePositions)) return initial.activePositions;
+    if (initial.activePosition) return [initial.activePosition];
+    return [];
+  });
+  const [adjustingPosId, setAdjustingPosId] = useState(null);
+
+  const activePosition = useMemo(() => {
+    const curPairPos = activePositions.find(p => p.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol);
+    return curPairPos || activePositions[0] || null;
+  }, [activePositions, selectedPairIdx]);
+
+  const setActivePosition = useCallback((valOrFn) => {
+    setActivePositions((prev) => {
+      const cur = prev.find(p => p.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol) || prev[0] || null;
+      const nextVal = typeof valOrFn === 'function' ? valOrFn(cur) : valOrFn;
+      if (nextVal === null) {
+        if (!cur) return prev;
+        return prev.filter(p => p.id !== cur.id);
+      }
+      if (!cur) {
+        return [...prev, nextVal];
+      }
+      return prev.map(p => p.id === cur.id ? nextVal : p);
+    });
+  }, [selectedPairIdx]);
+
   const [tradeHistory, setTradeHistory] = useState(initial.tradeHistory);
   const [tickerIdx, setTickerIdx] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -1529,11 +1568,11 @@ function TradingGame() {
           return pair.marketType === 'degen_perps' || pair.category === 'meme' || pair.category === 'degen';
         }
         if (pairCategoryFilter === 'hasPos') {
-          return activePosition?.pairSymbol === pair.symbol;
+          return activePositions.some((p) => p.pairSymbol === pair.symbol);
         }
         return true;
       });
-  }, [pairSearchQuery, pairCategoryFilter, activePosition]);
+  }, [pairSearchQuery, pairCategoryFilter, activePositions]);
 
   // Chart TradingView-Style Interactive X & Y Axis Zoom & 2D Panning
   const [chartXZoom, setChartXZoom] = useState(1);
@@ -1694,7 +1733,7 @@ function TradingGame() {
               }
             }
 
-            if (needsHydration) {
+            if (needsHydration && typeof sessionStorage !== 'undefined' && !sessionStorage.getItem('seeded')) {
               localStorage.setItem(SAVE_KEY, JSON.stringify(cloudSave));
               triggerToast(`Akun @${data.user.username} terdeteksi! Memulihkan data game dari cloud...`, 'success');
               setTimeout(() => {
@@ -2508,28 +2547,48 @@ function TradingGame() {
     return () => clearTimeout(t);
   }, [toastMessage]);
 
-  const livePositionStats = useMemo(() => {
-    if (!activePosition) return null;
-    const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === activePosition.pairSymbol);
+  const getPositionLiveStats = useCallback((pos) => {
+    if (!pos) return null;
+    const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === pos.pairSymbol);
     const posPrice = posPairIdx >= 0 && marketPricesRef.current[posPairIdx]
       ? marketPricesRef.current[posPairIdx]
-      : currentPrice;
+      : (pos.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol ? currentPrice : pos.entryPrice);
 
     const diffRatio =
-      activePosition.type === 'LONG'
-        ? (posPrice - activePosition.entryPrice) / activePosition.entryPrice
-        : (activePosition.entryPrice - posPrice) / activePosition.entryPrice;
-    const rawRoiPercent = diffRatio * activePosition.leverage * 100;
+      pos.type === 'LONG'
+        ? (posPrice - pos.entryPrice) / pos.entryPrice
+        : (pos.entryPrice - posPrice) / pos.entryPrice;
+    const rawRoiPercent = diffRatio * pos.leverage * 100;
     const roiPercent = rawRoiPercent;
-    const pnlDollar = activePosition.margin * (roiPercent / 100);
-    const equity = Math.max(0, activePosition.margin + pnlDollar);
+    const pnlDollar = pos.margin * (roiPercent / 100);
+    const equity = Math.max(0, pos.margin + pnlDollar);
     return { roiPercent, pnlDollar, equity, rawRoiPercent, rawPnlDollar: pnlDollar, posPrice };
-  }, [activePosition, currentPrice, selectedPairIdx]);
+  }, [currentPrice, selectedPairIdx]);
+
+  const livePositionStats = useMemo(() => {
+    if (!activePosition) return null;
+    return getPositionLiveStats(activePosition);
+  }, [activePosition, getPositionLiveStats]);
+
+  const totalPositionsStats = useMemo(() => {
+    let totalMargin = 0;
+    let totalPnl = 0;
+    let totalEquity = 0;
+    for (const pos of activePositions) {
+      const stats = getPositionLiveStats(pos);
+      if (stats) {
+        totalMargin += pos.margin;
+        totalPnl += stats.pnlDollar;
+        totalEquity += stats.equity;
+      }
+    }
+    const totalRoiPercent = totalMargin > 0 ? (totalPnl / totalMargin) * 100 : 0;
+    return { totalMargin, totalPnl, totalEquity, totalRoiPercent };
+  }, [activePositions, getPositionLiveStats]);
 
   const netWorth = useMemo(() => {
-    const posEquity = livePositionStats ? livePositionStats.equity : 0;
-    return cash + posEquity;
-  }, [cash, livePositionStats]);
+    return cash + totalPositionsStats.totalEquity;
+  }, [cash, totalPositionsStats.totalEquity]);
 
   useEffect(() => {
     if (netWorth > peakNetWorth) {
@@ -2538,10 +2597,10 @@ function TradingGame() {
   }, [netWorth, peakNetWorth]);
 
   useEffect(() => {
-    if (!activePosition && isAdjustModalOpen) {
+    if (activePositions.length === 0 && isAdjustModalOpen) {
       setIsAdjustModalOpen(false);
     }
-  }, [activePosition, isAdjustModalOpen]);
+  }, [activePositions, isAdjustModalOpen]);
 
   const orderRawMargin = cash * (betPercent / 100);
   const orderEffectiveMargin = Math.max(0, orderRawMargin * (1 - 0.015));
@@ -2590,33 +2649,38 @@ function TradingGame() {
     );
   }, [activePosition]);
 
+  const modalPosition = useMemo(() => {
+    return activePositions.find(p => p.id === adjustingPosId) || activePosition;
+  }, [activePositions, adjustingPosId, activePosition]);
+
   const modalTpEst = useMemo(() => {
-    if (!activePosition) return null;
+    if (!modalPosition) return null;
     const p = parseFloat(adjustTpInput);
     if (!p || isNaN(p) || p <= 0) return null;
-    const isLong = activePosition.type === 'LONG';
-    const isValid = isLong ? p > activePosition.entryPrice : p < activePosition.entryPrice;
+    const isLong = modalPosition.type === 'LONG';
+    const isValid = isLong ? p > modalPosition.entryPrice : p < modalPosition.entryPrice;
     if (!isValid) return { isValid: false };
     const est = calculatePnlEstimate(
       p,
-      activePosition.entryPrice,
-      activePosition.margin,
-      activePosition.leverage,
-      activePosition.type
+      modalPosition.entryPrice,
+      modalPosition.margin,
+      modalPosition.leverage,
+      modalPosition.type
     );
     return { ...est, isValid: true };
-  }, [activePosition, adjustTpInput]);
+  }, [modalPosition, adjustTpInput]);
 
   const modalSlEst = useMemo(() => {
-    if (!activePosition) return null;
+    if (!modalPosition) return null;
     const p = parseFloat(adjustSlInput);
     if (!p || isNaN(p) || p <= 0) return null;
-    const isLong = activePosition.type === 'LONG';
-    const curP = marketPricesRef.current[selectedPairIdx] || activePosition.entryPrice;
-    const isLiqBreached = isLong ? p <= activePosition.liqPrice : p >= activePosition.liqPrice;
+    const isLong = modalPosition.type === 'LONG';
+    const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === modalPosition.pairSymbol);
+    const curP = (posPairIdx >= 0 && marketPricesRef.current[posPairIdx]) || modalPosition.entryPrice;
+    const isLiqBreached = isLong ? p <= modalPosition.liqPrice : p >= modalPosition.liqPrice;
     const isCurrentPriceBreached = isLong ? p >= curP : p <= curP;
-    const isTpBreached = activePosition.tpPrice
-      ? (isLong ? p >= activePosition.tpPrice : p <= activePosition.tpPrice)
+    const isTpBreached = modalPosition.tpPrice
+      ? (isLong ? p >= modalPosition.tpPrice : p <= modalPosition.tpPrice)
       : false;
 
     if (isLiqBreached || isCurrentPriceBreached || isTpBreached) {
@@ -2629,16 +2693,16 @@ function TradingGame() {
     }
     const est = calculatePnlEstimate(
       p,
-      activePosition.entryPrice,
-      activePosition.margin,
-      activePosition.leverage,
-      activePosition.type
+      modalPosition.entryPrice,
+      modalPosition.margin,
+      modalPosition.leverage,
+      modalPosition.type
     );
-    const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-    const isBep = Math.abs(p - activePosition.entryPrice) <= (1 / Math.pow(10, modalPrec));
-    const isProfitLock = isLong ? p > activePosition.entryPrice : p < activePosition.entryPrice;
+    const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
+    const isBep = Math.abs(p - modalPosition.entryPrice) <= (1 / Math.pow(10, modalPrec));
+    const isProfitLock = isLong ? p > modalPosition.entryPrice : p < modalPosition.entryPrice;
     return { ...est, isValid: true, isBep, isProfitLock };
-  }, [activePosition, adjustSlInput, selectedPairIdx]);
+  }, [modalPosition, adjustSlInput]);
 
   const isDailyClaimed = useMemo(() => {
     if (!lastDailyClaim || lastDailyClaim <= 0) return false;
@@ -2808,7 +2872,8 @@ function TradingGame() {
   useLayoutEffect(() => {
     latest.current = {
       cash, peakNetWorth: Math.max(peakNetWorth, netWorth), whaleTokens, passiveLevels,
-      activePosition, tradeHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
+      activePositions, activePosition: activePositions.length > 0 ? activePositions[0] : null,
+      tradeHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
       inventory, activeEffects, dailyWhaleUsage
@@ -3215,31 +3280,27 @@ function TradingGame() {
 
     // Skala Y berpusat pada candlestick. Posisi aktif hanya memperluas skala jika levelnya
     // berada pada pair yang sedang dilihat. JANGAN biarkan liquidation jauh meledakkan skala!
-    const isPosOnActivePair = activePosition && activePosition.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol;
-    if (isPosOnActivePair) {
+    const curPairPositions = activePositions.filter(p => p.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol);
+    if (curPairPositions.length > 0) {
       const maxProximity = candleSpan * 1.8;
-
-      // Sertakan entry price jika dekat dengan lilin
-      if (Math.abs(activePosition.entryPrice - currentPrice) <= maxProximity) {
-        viewMin = Math.min(viewMin, activePosition.entryPrice);
-        viewMax = Math.max(viewMax, activePosition.entryPrice);
-      }
-
-      // Liq price hanya disertakan jika harga sudah sangat mendekati liquidation (kondisi kritis)
-      if (Math.abs(activePosition.liqPrice - currentPrice) <= maxProximity * 0.75) {
-        viewMin = Math.min(viewMin, activePosition.liqPrice);
-        viewMax = Math.max(viewMax, activePosition.liqPrice);
-      }
-
-      // TP & SL hanya disertakan jika dekat dengan lilin
-      if (activePosition.tpPrice && Math.abs(activePosition.tpPrice - currentPrice) <= maxProximity) {
-        viewMin = Math.min(viewMin, activePosition.tpPrice);
-        viewMax = Math.max(viewMax, activePosition.tpPrice);
-      }
-      if (activePosition.slPrice && Math.abs(activePosition.slPrice - currentPrice) <= maxProximity) {
-        viewMin = Math.min(viewMin, activePosition.slPrice);
-        viewMax = Math.max(viewMax, activePosition.slPrice);
-      }
+      curPairPositions.forEach((pos) => {
+        if (Math.abs(pos.entryPrice - currentPrice) <= maxProximity) {
+          viewMin = Math.min(viewMin, pos.entryPrice);
+          viewMax = Math.max(viewMax, pos.entryPrice);
+        }
+        if (Math.abs(pos.liqPrice - currentPrice) <= maxProximity * 0.75) {
+          viewMin = Math.min(viewMin, pos.liqPrice);
+          viewMax = Math.max(viewMax, pos.liqPrice);
+        }
+        if (pos.tpPrice && Math.abs(pos.tpPrice - currentPrice) <= maxProximity) {
+          viewMin = Math.min(viewMin, pos.tpPrice);
+          viewMax = Math.max(viewMax, pos.tpPrice);
+        }
+        if (pos.slPrice && Math.abs(pos.slPrice - currentPrice) <= maxProximity) {
+          viewMin = Math.min(viewMin, pos.slPrice);
+          viewMax = Math.max(viewMax, pos.slPrice);
+        }
+      });
     }
 
     const effectiveSpan = viewMax - viewMin;
@@ -3484,14 +3545,14 @@ function TradingGame() {
     }
 
     // 1.5 Active position indicators (Clean & refined minimalist styling ala TradingView)
-    if (isPosOnActivePair) {
-      const drawPositionLineInChart = (price, color, label, isAdjustable = false, dragType = null) => {
+    if (curPairPositions.length > 0) {
+      const drawPositionLineInChart = (pos, price, color, label, isAdjustable = false, dragType = null) => {
         if (!price || isNaN(price)) return;
         const y = toY(price);
         if (y < 15 || y > chartHeight - 15) return;
 
-        const isBeingDragged = Boolean(dragType && draggingTpSlType === dragType);
-        const isHovered = Boolean(dragType && hoveredAdjustable === dragType && !activeDrawingTool);
+        const isBeingDragged = Boolean(dragType && draggingTpSlType === dragType && activePosition?.id === pos.id);
+        const isHovered = Boolean(dragType && hoveredAdjustable === dragType && !activeDrawingTool && activePosition?.id === pos.id);
 
         // Clean subtle dashed line across the chart (no thick bulky glow)
         ctx.strokeStyle = isBeingDragged ? '#FFFFFF' : (isHovered ? '#FFFFFF' : color);
@@ -3507,29 +3568,29 @@ function TradingGame() {
         let tagText = `${label} ${formatPairPrice(price, pairBasePrecision)}`;
         let pillColor = color;
 
-        if (label === 'ENTRY' && activePosition) {
-          const isLong = activePosition.type === 'LONG';
-          const diff = isLong ? currentPrice - activePosition.entryPrice : activePosition.entryPrice - currentPrice;
-          const roi = (diff / activePosition.entryPrice) * activePosition.leverage * 100;
-          const pnl = activePosition.margin * (roi / 100);
+        if (label === 'ENTRY') {
+          const isLong = pos.type === 'LONG';
+          const diff = isLong ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
+          const roi = (diff / pos.entryPrice) * pos.leverage * 100;
+          const pnl = pos.margin * (roi / 100);
           const pnlSign = pnl >= 0 ? '+' : '-';
           const pnlStr = `${pnlSign}${formatMoney(Math.abs(pnl))}`;
           const roiStr = `${pnlSign}${Math.abs(roi).toFixed(1)}%`;
-          tagText = `ENTRY ${formatPairPrice(price, pairBasePrecision)} (${pnlStr} / ${roiStr})`;
+          tagText = `${pos.type} ${pos.leverage}x ENTRY ${formatPairPrice(price, pairBasePrecision)} (${pnlStr} / ${roiStr})`;
           pillColor = pnl >= 0 ? '#10B981' : '#F43F5E';
-        } else if (isBeingDragged && activePosition) {
-          const isLong = activePosition.type === 'LONG';
-          const diff = isLong ? price - activePosition.entryPrice : activePosition.entryPrice - price;
-          const estRoi = (diff / activePosition.entryPrice) * activePosition.leverage * 100;
-          const estDollar = activePosition.margin * (estRoi / 100);
+        } else if (isBeingDragged) {
+          const isLong = pos.type === 'LONG';
+          const diff = isLong ? price - pos.entryPrice : pos.entryPrice - price;
+          const estRoi = (diff / pos.entryPrice) * pos.leverage * 100;
+          const estDollar = pos.margin * (estRoi / 100);
           const estStr = estDollar >= 0 ? `+${formatMoney(estDollar)}` : `-${formatMoney(Math.abs(estDollar))}`;
           tagText = `${label} ${formatPairPrice(price, pairBasePrecision)} (${estStr})`;
           pillColor = '#FFFFFF';
-        } else if (isAdjustable && activePosition) {
-          const isLong = activePosition.type === 'LONG';
-          const diff = isLong ? price - activePosition.entryPrice : activePosition.entryPrice - price;
-          const estRoi = (diff / activePosition.entryPrice) * activePosition.leverage * 100;
-          const estDollar = activePosition.margin * (estRoi / 100);
+        } else if (isAdjustable) {
+          const isLong = pos.type === 'LONG';
+          const diff = isLong ? price - pos.entryPrice : pos.entryPrice - price;
+          const estRoi = (diff / pos.entryPrice) * pos.leverage * 100;
+          const estDollar = pos.margin * (estRoi / 100);
           const estStr = estDollar >= 0 ? `+${formatMoney(estDollar)}` : `-${formatMoney(Math.abs(estDollar))}`;
           tagText = `${label} ${formatPairPrice(price, pairBasePrecision)} (${estStr}) ⇅`;
         }
@@ -3545,76 +3606,78 @@ function TradingGame() {
         ctx.fillText(tagText, tagX + 7, y + 3.2);
       };
 
-      drawPositionLineInChart(activePosition.entryPrice, '#38BDF8', 'ENTRY', false, null);
-      drawPositionLineInChart(activePosition.liqPrice, '#F43F5E', 'LIQ', false, null);
-      if (activePosition.tpPrice) drawPositionLineInChart(activePosition.tpPrice, '#10B981', 'TP', true, 'TP');
-      if (activePosition.slPrice) {
-        const isLong = activePosition.type === 'LONG';
-        const entry = activePosition.entryPrice;
-        const sl = activePosition.slPrice;
-        let slColor = '#F59E0B';
-        let slLabel = 'SL';
-        if (Math.abs(sl - entry) <= (1 / Math.pow(10, pairBasePrecision))) {
-          slColor = '#38BDF8';
-          slLabel = 'SL BEP';
-        } else if (isLong ? sl > entry : sl < entry) {
-          slColor = '#10B981';
-          slLabel = 'SL+';
+      curPairPositions.forEach((pos) => {
+        drawPositionLineInChart(pos, pos.entryPrice, '#38BDF8', 'ENTRY', false, null);
+        drawPositionLineInChart(pos, pos.liqPrice, '#F43F5E', 'LIQ', false, null);
+        if (pos.tpPrice) drawPositionLineInChart(pos, pos.tpPrice, '#10B981', 'TP', true, 'TP');
+        if (pos.slPrice) {
+          const isLong = pos.type === 'LONG';
+          const entry = pos.entryPrice;
+          const sl = pos.slPrice;
+          let slColor = '#F59E0B';
+          let slLabel = 'SL';
+          if (Math.abs(sl - entry) <= (1 / Math.pow(10, pairBasePrecision))) {
+            slColor = '#38BDF8';
+            slLabel = 'SL BEP';
+          } else if (isLong ? sl > entry : sl < entry) {
+            slColor = '#10B981';
+            slLabel = 'SL+';
+          }
+          drawPositionLineInChart(pos, pos.slPrice, slColor, slLabel, true, 'SL');
         }
-        drawPositionLineInChart(activePosition.slPrice, slColor, slLabel, true, 'SL');
-      }
 
-      // Off-screen Liquidation Navigator Pill (TradingView-style off-chart alert)
-      if (activePosition.liqPrice > maxPrice) {
-        const distPct = (((activePosition.liqPrice - currentPrice) / currentPrice) * 100).toFixed(1);
-        const liqText = `▲ LIQ: ${formatPairPrice(activePosition.liqPrice, pairBasePrecision)} (+${distPct}%)`;
-        ctx.font = 'bold 9.5px monospace';
-        const pillW = ctx.measureText(liqText).width + 16;
-        drawPill(chartWidth - pillW - 10, 14, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
-        ctx.fillStyle = '#FB7185';
-        ctx.fillText(liqText, chartWidth - pillW - 2, 27.5);
-      } else if (activePosition.liqPrice < minPrice) {
-        const distPct = (((currentPrice - activePosition.liqPrice) / currentPrice) * 100).toFixed(1);
-        const liqText = `▼ LIQ: ${formatPairPrice(activePosition.liqPrice, pairBasePrecision)} (-${distPct}%)`;
-        ctx.font = 'bold 9.5px monospace';
-        const pillW = ctx.measureText(liqText).width + 16;
-        drawPill(chartWidth - pillW - 10, chartHeight - 26, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
-        ctx.fillStyle = '#FB7185';
-        ctx.fillText(liqText, chartWidth - pillW - 2, chartHeight - 12.5);
-      }
+        // Off-screen Liquidation Navigator Pill (TradingView-style off-chart alert)
+        if (pos.liqPrice > maxPrice) {
+          const distPct = (((pos.liqPrice - currentPrice) / currentPrice) * 100).toFixed(1);
+          const liqText = `▲ LIQ: ${formatPairPrice(pos.liqPrice, pairBasePrecision)} (+${distPct}%)`;
+          ctx.font = 'bold 9.5px monospace';
+          const pillW = ctx.measureText(liqText).width + 16;
+          drawPill(chartWidth - pillW - 10, 14, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
+          ctx.fillStyle = '#FB7185';
+          ctx.fillText(liqText, chartWidth - pillW - 2, 27.5);
+        } else if (pos.liqPrice < minPrice) {
+          const distPct = (((currentPrice - pos.liqPrice) / currentPrice) * 100).toFixed(1);
+          const liqText = `▼ LIQ: ${formatPairPrice(pos.liqPrice, pairBasePrecision)} (-${distPct}%)`;
+          ctx.font = 'bold 9.5px monospace';
+          const pillW = ctx.measureText(liqText).width + 16;
+          drawPill(chartWidth - pillW - 10, chartHeight - 26, pillW, 20, 5, 'rgba(244, 63, 94, 0.15)', '#F43F5E', 1);
+          ctx.fillStyle = '#FB7185';
+          ctx.fillText(liqText, chartWidth - pillW - 2, chartHeight - 12.5);
+        }
 
-      // Off-screen TP/SL Navigator Pills if outside view
-      if (activePosition.tpPrice && activePosition.tpPrice > maxPrice) {
-        const tpText = `▲ TP: ${formatPairPrice(activePosition.tpPrice, pairBasePrecision)}`;
-        ctx.font = 'bold 9px monospace';
-        const pillW = ctx.measureText(tpText).width + 12;
-        drawPill(chartWidth - pillW - 10, 38, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
-        ctx.fillStyle = '#34D399';
-        ctx.fillText(tpText, chartWidth - pillW - 4, 50.5);
-      } else if (activePosition.tpPrice && activePosition.tpPrice < minPrice) {
-        const tpText = `▼ TP: ${formatPairPrice(activePosition.tpPrice, pairBasePrecision)}`;
-        ctx.font = 'bold 9px monospace';
-        const pillW = ctx.measureText(tpText).width + 12;
-        drawPill(chartWidth - pillW - 10, chartHeight - 48, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
-        ctx.fillStyle = '#34D399';
-        ctx.fillText(tpText, chartWidth - pillW - 4, chartHeight - 35.5);
-      }
+        // Off-screen TP/SL Navigator Pills if outside view
+        if (pos.tpPrice && pos.tpPrice > maxPrice) {
+          const tpText = `▲ TP: ${formatPairPrice(pos.tpPrice, pairBasePrecision)}`;
+          ctx.font = 'bold 9px monospace';
+          const pillW = ctx.measureText(tpText).width + 12;
+          drawPill(chartWidth - pillW - 10, 38, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
+          ctx.fillStyle = '#34D399';
+          ctx.fillText(tpText, chartWidth - pillW - 4, 50.5);
+        } else if (pos.tpPrice && pos.tpPrice < minPrice) {
+          const tpText = `▼ TP: ${formatPairPrice(pos.tpPrice, pairBasePrecision)}`;
+          ctx.font = 'bold 9px monospace';
+          const pillW = ctx.measureText(tpText).width + 12;
+          drawPill(chartWidth - pillW - 10, chartHeight - 48, pillW, 18, 4, 'rgba(16, 185, 129, 0.15)', '#10B981', 1);
+          ctx.fillStyle = '#34D399';
+          ctx.fillText(tpText, chartWidth - pillW - 4, chartHeight - 35.5);
+        }
 
-      if (activePosition.slPrice && activePosition.slPrice > maxPrice) {
-        const slText = `▲ SL: ${formatPairPrice(activePosition.slPrice, pairBasePrecision)}`;
-        ctx.font = 'bold 9px monospace';
-        const pillW = ctx.measureText(slText).width + 12;
-        drawPill(chartWidth - pillW - 10, 60, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
-        ctx.fillStyle = '#FBBF24';
-        ctx.fillText(slText, chartWidth - pillW - 4, 72.5);
-      } else if (activePosition.slPrice && activePosition.slPrice < minPrice) {
-        const slText = `▼ SL: ${formatPairPrice(activePosition.slPrice, pairBasePrecision)}`;
-        ctx.font = 'bold 9px monospace';
-        const pillW = ctx.measureText(slText).width + 12;
-        drawPill(chartWidth - pillW - 10, chartHeight - 70, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
-        ctx.fillStyle = '#FBBF24';
-        ctx.fillText(slText, chartWidth - pillW - 4, chartHeight - 57.5);
-      }
+        if (pos.slPrice && pos.slPrice > maxPrice) {
+          const slText = `▲ SL: ${formatPairPrice(pos.slPrice, pairBasePrecision)}`;
+          ctx.font = 'bold 9px monospace';
+          const pillW = ctx.measureText(slText).width + 12;
+          drawPill(chartWidth - pillW - 10, 60, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
+          ctx.fillStyle = '#FBBF24';
+          ctx.fillText(slText, chartWidth - pillW - 4, 72.5);
+        } else if (pos.slPrice && pos.slPrice < minPrice) {
+          const slText = `▼ SL: ${formatPairPrice(pos.slPrice, pairBasePrecision)}`;
+          ctx.font = 'bold 9px monospace';
+          const pillW = ctx.measureText(slText).width + 12;
+          drawPill(chartWidth - pillW - 10, chartHeight - 70, pillW, 18, 4, 'rgba(245, 158, 11, 0.15)', '#F59E0B', 1);
+          ctx.fillStyle = '#FBBF24';
+          ctx.fillText(slText, chartWidth - pillW - 4, chartHeight - 57.5);
+        }
+      });
     }
 
     // Helper to draw clean circular anchor handle
@@ -3876,7 +3939,7 @@ function TradingGame() {
     });
 
     // Active position right axis price pills
-    if (isPosOnActivePair) {
+    if (curPairPositions.length > 0) {
       const drawPositionPricePill = (price, color) => {
         if (!price || isNaN(price)) return;
         const y = toY(price);
@@ -3887,21 +3950,23 @@ function TradingGame() {
         ctx.fillText(formatPairPrice(price, dynamicPrecision), chartWidth + 7, y + 3.5);
       };
 
-      drawPositionPricePill(activePosition.entryPrice, '#38BDF8');
-      drawPositionPricePill(activePosition.liqPrice, '#F43F5E');
-      if (activePosition.tpPrice) drawPositionPricePill(activePosition.tpPrice, '#10B981');
-      if (activePosition.slPrice) {
-        const isLong = activePosition.type === 'LONG';
-        const entry = activePosition.entryPrice;
-        const sl = activePosition.slPrice;
-        let slPillColor = '#F59E0B';
-        if (Math.abs(sl - entry) <= (1 / Math.pow(10, dynamicPrecision))) {
-          slPillColor = '#38BDF8';
-        } else if (isLong ? sl > entry : sl < entry) {
-          slPillColor = '#10B981';
+      curPairPositions.forEach((pos) => {
+        drawPositionPricePill(pos.entryPrice, '#38BDF8');
+        drawPositionPricePill(pos.liqPrice, '#F43F5E');
+        if (pos.tpPrice) drawPositionPricePill(pos.tpPrice, '#10B981');
+        if (pos.slPrice) {
+          const isLong = pos.type === 'LONG';
+          const entry = pos.entryPrice;
+          const sl = pos.slPrice;
+          let slPillColor = '#F59E0B';
+          if (Math.abs(sl - entry) <= (1 / Math.pow(10, dynamicPrecision))) {
+            slPillColor = '#38BDF8';
+          } else if (isLong ? sl > entry : sl < entry) {
+            slPillColor = '#10B981';
+          }
+          drawPositionPricePill(pos.slPrice, slPillColor);
         }
-        drawPositionPricePill(activePosition.slPrice, slPillColor);
-      }
+      });
     }
 
     // Current price right axis pill & countdown
@@ -4075,7 +4140,12 @@ function TradingGame() {
         setCandlesticksByTf(prevMap => {
           const next = { ...prevMap };
           const pairsToUpdate = new Set([pairIdx]);
-          if (state.activePosition) {
+          if (Array.isArray(state.activePositions)) {
+            state.activePositions.forEach((p) => {
+              const posIdx = MARKET_PAIRS.findIndex(mp => mp.symbol === p.pairSymbol);
+              if (posIdx >= 0) pairsToUpdate.add(posIdx);
+            });
+          } else if (state.activePosition) {
             const posIdx = MARKET_PAIRS.findIndex(p => p.symbol === state.activePosition.pairSymbol);
             if (posIdx >= 0) pairsToUpdate.add(posIdx);
           }
@@ -4111,92 +4181,252 @@ function TradingGame() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!activePosition) return;
-    if (settledPositionRef.current === activePosition.id) return;
+  const closePositionById = useCallback((posId, isAuto = false, customReason = '') => {
+    setActivePositions((prevPositions) => {
+      const pos = prevPositions.find(p => p.id === posId);
+      if (!pos) return prevPositions;
+      if (settledPositionRef.current === pos.id) return prevPositions.filter(p => p.id !== posId);
+      settledPositionRef.current = pos.id;
 
-    const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === activePosition.pairSymbol);
-    const posPrice = posPairIdx >= 0 && marketPricesRef.current[posPairIdx]
-      ? marketPricesRef.current[posPairIdx]
-      : currentPrice;
+      const stats = getPositionLiveStats(pos);
+      const pnlAmount = stats ? stats.pnlDollar : 0;
+      const roiPercent = stats ? stats.roiPercent : 0;
+      const closingTax = pnlAmount > 0 ? pnlAmount * 0.01 : 0;
+      const returnedCash = Math.max(0, pos.margin + pnlAmount - closingTax);
 
-    const isLong = activePosition.type === 'LONG';
-    const isPriceLiq = isLong ? posPrice <= activePosition.liqPrice : posPrice >= activePosition.liqPrice;
-    const isTpHit = activePosition.tpPrice && (isLong ? posPrice >= activePosition.tpPrice : posPrice <= activePosition.tpPrice);
-    const isSlHit = activePosition.slPrice && (isLong ? posPrice <= activePosition.slPrice : posPrice >= activePosition.slPrice);
-    const isRoiLiq = livePositionStats && livePositionStats.roiPercent <= -95;
-
-    if (isPriceLiq || isRoiLiq) {
-      settledPositionRef.current = activePosition.id;
-
-      // Feature 1: Liquidation Shield Defense Consumable
-      if ((inventory?.liq_shield || 0) > 0) {
-        setInventory((prev) => ({
-          ...prev,
-          liq_shield: Math.max(0, (prev.liq_shield || 0) - 1)
-        }));
-        const refund = activePosition.margin * 0.85;
-        const lost = activePosition.margin - refund;
-        setCash((c) => c + refund);
+      setCash((c) => c + returnedCash);
+      if (pnlAmount >= 0) {
         playProfitSound();
-        triggerToast(t.toastLiqShieldSaved || '🛡️ LIQUIDATION SHIELD PECAH! 85% modal margin berhasil diselamatkan!', 'warning');
-        setTradeHistory((prev) => [
-          {
-            id: Date.now(),
-            pair: activePosition.pairSymbol,
-            type: activePosition.type,
-            leverage: activePosition.leverage,
-            pnl: -lost,
-            roi: -15,
-            status: 'DEFENDED'
-          },
-          ...prev.slice(0, 19)
-        ]);
-        addCashLog({
-          type: 'TRADE_SHIELD',
-          category: 'trade',
-          title: `Shield: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
-          amount: -lost,
-          detail: `85% Margin (${formatMoney(refund)}) Terselamatkan`
-        });
-        setActivePosition(null);
-        return;
+      } else {
+        playLossSound();
       }
 
-      playLiquidationSound();
-      const lost = activePosition.margin;
-      setLiquidationAlert({
-        lostAmount: lost,
-        pair: activePosition.pairSymbol,
-        leverage: activePosition.leverage,
-        type: activePosition.type
-      });
+      if (isAuto) {
+        triggerToast(`${pos.pairSymbol} - ${customReason} tercapai! PnL: ${formatMoney(pnlAmount)}`, pnlAmount >= 0 ? 'success' : 'danger');
+      } else if (pnlAmount >= 0) {
+        triggerToast(
+          `${pos.pairSymbol} - TAKE PROFIT! Net Cuan ${formatMoney(pnlAmount - closingTax)} (${roiPercent.toFixed(1)}%)`,
+          'success'
+        );
+      } else {
+        triggerToast(`${pos.pairSymbol} - Cut Loss sebesar ${formatMoney(pnlAmount)}`, 'warning');
+      }
+
+      const netPnl = pnlAmount - closingTax;
+      const isWin = netPnl > 0;
+      const isHighLev = pos.leverage >= 50;
+
       setTradeHistory((prev) => [
         {
           id: Date.now(),
-          pair: activePosition.pairSymbol,
-          type: activePosition.type,
-          leverage: activePosition.leverage,
+          pair: pos.pairSymbol,
+          type: pos.type,
+          leverage: pos.leverage,
+          pnl: netPnl,
+          roi: roiPercent,
+          status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
+        },
+        ...prev.slice(0, 19)
+      ]);
+
+      addCashLog({
+        type: 'TRADE',
+        category: 'trade',
+        title: `${netPnl >= 0 ? 'Profit Trade' : 'Cut Loss'}: ${pos.type} ${pos.pairSymbol} ${pos.leverage}x`,
+        amount: netPnl,
+        detail: `${isAuto ? customReason : 'Close Manual'} • ROI ${roiPercent.toFixed(1)}%`
+      });
+
+      setQuestStats((prev) => ({
+        ...prev,
+        totalTradesClosed: (prev.totalTradesClosed || 0) + 1,
+        profitableTrades: isWin ? (prev.profitableTrades || 0) + 1 : (prev.profitableTrades || 0),
+        highLevWin: prev.highLevWin || (isWin && isHighLev)
+      }));
+
+      if (isWin) {
+        setDailyQuestState((prev) => ({
+          ...prev,
+          profitTotal: (prev.profitTotal || 0) + netPnl
+        }));
+      }
+
+      return prevPositions.filter(p => p.id !== posId);
+    });
+  }, [getPositionLiveStats, playProfitSound, playLossSound, triggerToast]);
+
+  const closePosition = useCallback((isAuto = false, customReason = '') => {
+    if (!activePosition) return;
+    closePositionById(activePosition.id, isAuto, customReason);
+  }, [activePosition, closePositionById]);
+
+  const closeAllPositions = useCallback(() => {
+    if (activePositions.length === 0) return;
+    const currentPositions = [...activePositions];
+    let totalReturnedCash = 0;
+    let netTotalPnl = 0;
+    const now = Date.now();
+    const newHistoryEntries = [];
+    const newCashLogs = [];
+    let winsCount = 0;
+    let anyHighLevWin = false;
+
+    currentPositions.forEach((pos, idx) => {
+      const stats = getPositionLiveStats(pos);
+      const pnlAmount = stats ? stats.pnlDollar : 0;
+      const roiPercent = stats ? stats.roiPercent : 0;
+      const closingTax = pnlAmount > 0 ? pnlAmount * 0.01 : 0;
+      const returnedCash = Math.max(0, pos.margin + pnlAmount - closingTax);
+      const netPnl = pnlAmount - closingTax;
+      totalReturnedCash += returnedCash;
+      netTotalPnl += netPnl;
+      if (netPnl > 0) {
+        winsCount += 1;
+        if (pos.leverage >= 50) anyHighLevWin = true;
+      }
+      newHistoryEntries.push({
+        id: now + idx,
+        pair: pos.pairSymbol,
+        type: pos.type,
+        leverage: pos.leverage,
+        pnl: netPnl,
+        roi: roiPercent,
+        status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
+      });
+      newCashLogs.push({
+        type: 'TRADE',
+        category: 'trade',
+        title: `${netPnl >= 0 ? 'Profit Trade' : 'Cut Loss'}: ${pos.type} ${pos.pairSymbol} ${pos.leverage}x`,
+        amount: netPnl,
+        detail: `Tutup Semua Posisi • ROI ${roiPercent.toFixed(1)}%`
+      });
+    });
+
+    setCash((c) => c + totalReturnedCash);
+    if (netTotalPnl >= 0) {
+      playProfitSound();
+      triggerToast(`Semua posisi ditutup! Net Total PnL: +${formatMoney(netTotalPnl)}`, 'success');
+    } else {
+      playLossSound();
+      triggerToast(`Semua posisi ditutup! Net Total PnL: ${formatMoney(netTotalPnl)}`, 'warning');
+    }
+
+    setTradeHistory((prev) => [...newHistoryEntries, ...prev].slice(0, 20));
+    setCashLogs((prev) => [...newCashLogs, ...prev].slice(0, 50));
+    setQuestStats((prev) => ({
+      ...prev,
+      totalTradesClosed: (prev.totalTradesClosed || 0) + currentPositions.length,
+      profitableTrades: (prev.profitableTrades || 0) + winsCount,
+      highLevWin: prev.highLevWin || anyHighLevWin
+    }));
+    if (netTotalPnl > 0) {
+      setDailyQuestState((prev) => ({
+        ...prev,
+        profitTotal: (prev.profitTotal || 0) + netTotalPnl
+      }));
+    }
+    setActivePositions([]);
+  }, [activePositions, getPositionLiveStats, playProfitSound, playLossSound, triggerToast]);
+
+  const handleLiquidationForPosition = useCallback((pos) => {
+    if (!pos) return;
+    settledPositionRef.current = pos.id;
+
+    // Feature 1: Liquidation Shield Defense Consumable
+    if ((inventory?.liq_shield || 0) > 0) {
+      setInventory((prev) => ({
+        ...prev,
+        liq_shield: Math.max(0, (prev.liq_shield || 0) - 1)
+      }));
+      const refund = pos.margin * 0.85;
+      const lost = pos.margin - refund;
+      setCash((c) => c + refund);
+      playProfitSound();
+      triggerToast(t.toastLiqShieldSaved || '🛡️ LIQUIDATION SHIELD PECAH! 85% modal margin berhasil diselamatkan!', 'warning');
+      setTradeHistory((prev) => [
+        {
+          id: Date.now(),
+          pair: pos.pairSymbol,
+          type: pos.type,
+          leverage: pos.leverage,
           pnl: -lost,
-          roi: -100,
-          status: 'LIQUIDATED'
+          roi: -15,
+          status: 'DEFENDED'
         },
         ...prev.slice(0, 19)
       ]);
       addCashLog({
-        type: 'TRADE_LIQ',
+        type: 'TRADE_SHIELD',
         category: 'trade',
-        title: `💀 Likuidasi: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
+        title: `Shield: ${pos.type} ${pos.pairSymbol} ${pos.leverage}x`,
         amount: -lost,
-        detail: `Margin ${formatMoney(lost)} hangus`
+        detail: `85% Margin (${formatMoney(refund)}) Terselamatkan`
       });
-      setActivePosition(null);
-    } else if (isTpHit) {
-      closePosition(true, 'TAKE PROFIT (TP)');
-    } else if (isSlHit) {
-      closePosition(true, 'STOP LOSS (SL)');
+      setActivePositions(prev => prev.filter(p => p.id !== pos.id));
+      return;
     }
-  }, [currentPrice, activePosition, livePositionStats]);
+
+    playLiquidationSound();
+    const lost = pos.margin;
+    setLiquidationAlert({
+      lostAmount: lost,
+      pair: pos.pairSymbol,
+      leverage: pos.leverage,
+      type: pos.type
+    });
+    setTradeHistory((prev) => [
+      {
+        id: Date.now(),
+        pair: pos.pairSymbol,
+        type: pos.type,
+        leverage: pos.leverage,
+        pnl: -lost,
+        roi: -100,
+        status: 'LIQUIDATED'
+      },
+      ...prev.slice(0, 19)
+    ]);
+    addCashLog({
+      type: 'TRADE_LIQ',
+      category: 'trade',
+      title: `💀 Likuidasi: ${pos.type} ${pos.pairSymbol} ${pos.leverage}x`,
+      amount: -lost,
+      detail: `Margin ${formatMoney(lost)} hangus`
+    });
+    setActivePositions(prev => prev.filter(p => p.id !== pos.id));
+  }, [inventory, playProfitSound, playLiquidationSound, triggerToast, t]);
+
+  useEffect(() => {
+    if (activePositions.length === 0) return;
+
+    for (const pos of activePositions) {
+      if (settledPositionRef.current === pos.id) continue;
+
+      const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === pos.pairSymbol);
+      const posPrice = posPairIdx >= 0 && marketPricesRef.current[posPairIdx]
+        ? marketPricesRef.current[posPairIdx]
+        : (pos.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol ? currentPrice : pos.entryPrice);
+
+      const isLong = pos.type === 'LONG';
+      const isPriceLiq = isLong ? posPrice <= pos.liqPrice : posPrice >= pos.liqPrice;
+      const isTpHit = pos.tpPrice && (isLong ? posPrice >= pos.tpPrice : posPrice <= pos.tpPrice);
+      const isSlHit = pos.slPrice && (isLong ? posPrice <= pos.slPrice : posPrice >= pos.slPrice);
+
+      const stats = getPositionLiveStats(pos);
+      const isRoiLiq = stats && stats.roiPercent <= -95;
+
+      if (isPriceLiq || isRoiLiq) {
+        handleLiquidationForPosition(pos);
+        break;
+      } else if (isTpHit) {
+        closePositionById(pos.id, true, 'TAKE PROFIT (TP)');
+        break;
+      } else if (isSlHit) {
+        closePositionById(pos.id, true, 'STOP LOSS (SL)');
+        break;
+      }
+    }
+  }, [currentPrice, activePositions, getPositionLiveStats, handleLiquidationForPosition, closePositionById, selectedPairIdx]);
 
   const triggerRandomEvent = useCallback((forcedType = null) => {
     const loc = latest.current?.currentLocation || currentLocation;
@@ -4355,8 +4585,8 @@ function TradingGame() {
   };
 
   const openPosition = (type) => {
-    if (activePosition) {
-      triggerToast('Tutup posisi aktif terlebih dahulu sebelum membuka posisi baru!', 'warning');
+    if (activePositions.length >= 5) {
+      triggerToast(t.maxPositionsAlert || 'Maksimal 5 posisi terbuka secara bersamaan!', 'warning');
       return;
     }
     const rawMargin = cash * (betPercent / 100);
@@ -4407,7 +4637,7 @@ function TradingGame() {
     setCash((c) => c - rawMargin);
     playOrderSound(type.toLowerCase());
 
-    setActivePosition({
+    const newPos = {
       id: makeId(),
       type,
       margin: effectiveMargin,
@@ -4418,7 +4648,9 @@ function TradingGame() {
       slPrice: !isNaN(parsedSl) && parsedSl > 0 ? parsedSl : null,
       pairSymbol: MARKET_PAIRS[selectedPairIdx].symbol,
       openedAt: Date.now()
-    });
+    };
+
+    setActivePositions((prev) => [...prev, newPos]);
 
     // If 250x God Leverage was used, consume the ticket
     if (leverage === 250) {
@@ -4612,116 +4844,53 @@ function TradingGame() {
     });
   };
 
-  const closePosition = (isAuto = false, customReason = '') => {
-    if (!activePosition || !livePositionStats) return;
-    if (settledPositionRef.current === activePosition.id) return;
-    settledPositionRef.current = activePosition.id;
-    const pnlAmount = livePositionStats.pnlDollar;
-    const roiPercent = livePositionStats.roiPercent;
-    const closingTax = pnlAmount > 0 ? pnlAmount * 0.01 : 0;
-    const returnedCash = Math.max(0, activePosition.margin + pnlAmount - closingTax);
-
-    setCash((c) => c + returnedCash);
-    if (pnlAmount >= 0) {
-      playProfitSound();
-    } else {
-      playLossSound();
-    }
-    if (isAuto) {
-      triggerToast(`${customReason} tercapai! PnL: ${formatMoney(pnlAmount)}`, pnlAmount >= 0 ? 'success' : 'danger');
-    } else if (pnlAmount >= 0) {
-      triggerToast(
-        `TAKE PROFIT! Net Cuan ${formatMoney(pnlAmount - closingTax)} (${roiPercent.toFixed(1)}%)`,
-        'success'
-      );
-    } else {
-      triggerToast(`Cut Loss sebesar ${formatMoney(pnlAmount)}`, 'warning');
-    }
-
-    setTradeHistory((prev) => [
-      {
-        id: Date.now(),
-        pair: activePosition.pairSymbol,
-        type: activePosition.type,
-        leverage: activePosition.leverage,
-        pnl: pnlAmount - closingTax,
-        roi: roiPercent,
-        status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
-      },
-      ...prev.slice(0, 19)
-    ]);
-
-    const netPnl = pnlAmount - closingTax;
-    const isWin = netPnl > 0;
-    const isHighLev = activePosition.leverage >= 50;
-
-    addCashLog({
-      type: 'TRADE',
-      category: 'trade',
-      title: `${netPnl >= 0 ? 'Profit Trade' : 'Cut Loss'}: ${activePosition.type} ${activePosition.pairSymbol} ${activePosition.leverage}x`,
-      amount: netPnl,
-      detail: `${isAuto ? customReason : 'Close Manual'} • ROI ${roiPercent.toFixed(1)}%`
-    });
-
-    setQuestStats((prev) => ({
-      ...prev,
-      totalTradesClosed: (prev.totalTradesClosed || 0) + 1,
-      profitableTrades: isWin ? (prev.profitableTrades || 0) + 1 : (prev.profitableTrades || 0),
-      highLevWin: prev.highLevWin || (isWin && isHighLev)
-    }));
-
-    if (isWin) {
-      setDailyQuestState((prev) => ({
-        ...prev,
-        profitTotal: (prev.profitTotal || 0) + netPnl
-      }));
-    }
-
-    setActivePosition(null);
-  };
-
-  const openAdjustModal = () => {
-    if (!activePosition) return;
-    setAdjustTpInput(activePosition.tpPrice ? String(activePosition.tpPrice) : '');
-    setAdjustSlInput(activePosition.slPrice ? String(activePosition.slPrice) : '');
+  const openAdjustModal = (pos = null) => {
+    const target = pos || modalPosition;
+    if (!target) return;
+    setAdjustingPosId(target.id);
+    setAdjustTpInput(target.tpPrice ? String(target.tpPrice) : '');
+    setAdjustSlInput(target.slPrice ? String(target.slPrice) : '');
     setAdjustError('');
     setIsAdjustModalOpen(true);
   };
 
   const applyTpRoiPreset = (pct) => {
-    if (!activePosition) return;
-    const isLong = activePosition.type === 'LONG';
-    const diffRatio = (pct / 100) / activePosition.leverage;
-    const target = isLong
-      ? activePosition.entryPrice * (1 + diffRatio)
-      : activePosition.entryPrice * (1 - diffRatio);
-    const posPrecision = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-    if (target > 0) {
-      setAdjustTpInput(target.toFixed(posPrecision));
+    const target = modalPosition;
+    if (!target) return;
+    const isLong = target.type === 'LONG';
+    const diffRatio = (pct / 100) / target.leverage;
+    const targetPrice = isLong
+      ? target.entryPrice * (1 + diffRatio)
+      : target.entryPrice * (1 - diffRatio);
+    const posPrecision = getPairPrecision(target.pairSymbol, target.entryPrice);
+    if (targetPrice > 0) {
+      setAdjustTpInput(targetPrice.toFixed(posPrecision));
       setAdjustError('');
     }
   };
 
   const applySlRoiPreset = (pct) => {
-    if (!activePosition) return;
-    const isLong = activePosition.type === 'LONG';
-    const diffRatio = (pct / 100) / activePosition.leverage;
-    const target = isLong
-      ? activePosition.entryPrice * (1 - diffRatio)
-      : activePosition.entryPrice * (1 + diffRatio);
-    const posPrecision = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-    if (target > 0) {
-      if ((isLong && target <= activePosition.liqPrice) || (!isLong && target >= activePosition.liqPrice)) {
-        setAdjustError(`Target SL -${pct}% melewati harga likuidasi (${formatPairPrice(activePosition.liqPrice, posPrecision)}).`);
+    const target = modalPosition;
+    if (!target) return;
+    const isLong = target.type === 'LONG';
+    const diffRatio = (pct / 100) / target.leverage;
+    const targetPrice = isLong
+      ? target.entryPrice * (1 - diffRatio)
+      : target.entryPrice * (1 + diffRatio);
+    const posPrecision = getPairPrecision(target.pairSymbol, target.entryPrice);
+    if (targetPrice > 0) {
+      if ((isLong && targetPrice <= target.liqPrice) || (!isLong && targetPrice >= target.liqPrice)) {
+        setAdjustError(`Target SL -${pct}% melewati harga likuidasi (${formatPairPrice(target.liqPrice, posPrecision)}).`);
       } else {
-        setAdjustSlInput(target.toFixed(posPrecision));
+        setAdjustSlInput(targetPrice.toFixed(posPrecision));
         setAdjustError('');
       }
     }
   };
 
   const handleSaveAdjustTpSl = () => {
-    if (!activePosition) return;
+    const target = modalPosition;
+    if (!target) return;
 
     const parsedTp = adjustTpInput.trim() ? Number(adjustTpInput) : null;
     const parsedSl = adjustSlInput.trim() ? Number(adjustSlInput) : null;
@@ -4735,10 +4904,10 @@ function TradingGame() {
       return;
     }
 
-    const isLong = activePosition.type === 'LONG';
-    const entry = activePosition.entryPrice;
-    const liq = activePosition.liqPrice;
-    const posPrecision = getPairPrecision(activePosition.pairSymbol, entry);
+    const isLong = target.type === 'LONG';
+    const entry = target.entryPrice;
+    const liq = target.liqPrice;
+    const posPrecision = getPairPrecision(target.pairSymbol, entry);
 
     if (parsedTp !== null) {
       if (isLong && parsedTp <= entry) {
@@ -4752,7 +4921,8 @@ function TradingGame() {
     }
 
     if (parsedSl !== null) {
-      const curMarketPrice = marketPricesRef.current[selectedPairIdx] || entry;
+      const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === target.pairSymbol);
+      const curMarketPrice = (posPairIdx >= 0 && marketPricesRef.current[posPairIdx]) || entry;
       if (isLong) {
         if (parsedSl <= liq) {
           setAdjustError(`SL untuk LONG (${formatPairPrice(parsedSl, posPrecision)}) tidak boleh di bawah/sama dengan harga likuidasi (${formatPairPrice(liq, posPrecision)}).`);
@@ -4782,14 +4952,13 @@ function TradingGame() {
       }
     }
 
-    setActivePosition((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        tpPrice: parsedTp,
-        slPrice: parsedSl
-      };
-    });
+    setActivePositions((prev) =>
+      prev.map((p) =>
+        p.id === target.id
+          ? { ...p, tpPrice: parsedTp, slPrice: parsedSl }
+          : p
+      )
+    );
 
     setIsAdjustModalOpen(false);
     triggerToast('Target TP & SL posisi berhasil diperbarui!', 'success');
@@ -4821,6 +4990,7 @@ function TradingGame() {
     setWhaleTokens(newTokens);
     setCash(10.0);
     setPeakNetWorth(10.0);
+    setActivePositions([]);
     setActivePosition(null);
     setBullRunLeft(0);
     setBearMarketLeft(0);
@@ -4859,6 +5029,7 @@ function TradingGame() {
       peakNetWorth: 10.0,
       whaleTokens: 0,
       passiveLevels: cleanLevels,
+      activePositions: [],
       activePosition: null,
       tradeHistory: [],
       cashLogs: [],
@@ -4901,6 +5072,7 @@ function TradingGame() {
     setCash(10.0);
     setPeakNetWorth(10.0);
     setWhaleTokens(0);
+    setActivePositions([]);
     setActivePosition(null);
     setTradeHistory([]);
     setCashLogs([]);
@@ -6343,314 +6515,363 @@ function TradingGame() {
                 language={language}
               />
 
-              {!activePosition ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
-                        <span>{t.marginCapital || 'MODAL MARGIN'} ({betPercent}%)</span>
-                        <span className="font-mono text-white font-bold">
-                          {formatMoney(cash * (betPercent / 100))}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[10, 25, 50, 100].map((pct) => (
-                          <button
-                            key={pct}
-                            onClick={() => setBetPercent(pct)}
-                            className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                              betPercent === pct
-                                ? 'bg-sky-500 text-slate-950'
-                                : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
-                            }`}
-                          >
-                            {pct}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+              {/* Order Execution Form (Always accessible for multi-position trading up to 5 concurrent positions) */}
+              <div className="flex flex-col gap-3">
+                {/* Available Margin & Position Slots Status */}
+                <div className="flex items-center justify-between px-1 text-[11px] font-mono">
+                  <span className="text-slate-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                    <span>{t.marginCapital || 'KAS TERSEDIA'}:</span>
+                    <strong className="text-white font-bold">{formatMoney(cash)}</strong>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    activePositions.length >= 5
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                      : activePositions.length > 0
+                      ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
+                    {t.slotsLeft || 'Slot Posisi'}: {activePositions.length}/5 {activePositions.length >= 5 ? '(Penuh)' : ''}
+                  </span>
+                </div>
 
-                    <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
-                        <span>{t.leverage || 'LEVERAGE'}</span>
-                        <span
-                          className={`font-mono font-bold ${
-                            leverage >= 250
-                              ? 'text-amber-400 animate-pulse'
-                              : leverage >= 50
-                              ? 'text-[#FF3366]'
-                              : 'text-amber-400'
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+                      <span>{t.marginCapital || 'MODAL MARGIN'} ({betPercent}%)</span>
+                      <span className="font-mono text-white font-bold">
+                        {formatMoney(cash * (betPercent / 100))}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[10, 25, 50, 100].map((pct) => (
+                        <button
+                          key={pct}
+                          onClick={() => setBetPercent(pct)}
+                          className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                            betPercent === pct
+                              ? 'bg-sky-500 text-slate-950'
+                              : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
                           }`}
                         >
-                          {leverage}x {leverage === 250 ? '⚡ GOD' : leverage === 100 ? '🔥 DEGEN' : ''}
-                        </span>
-                      </div>
-                      <div className={`grid ${activeEffects.has250xTicket || leverage === 250 ? 'grid-cols-5' : 'grid-cols-4'} gap-1.5`}>
-                        {[2, 10, 50, 100, ...(activeEffects.has250xTicket || leverage === 250 ? [250] : [])].map((lev) => (
-                          <button
-                            key={lev}
-                            onClick={() => setLeverage(lev)}
-                            className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                              leverage === lev
-                                ? lev >= 250
-                                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
-                                  : lev >= 50
-                                  ? 'bg-[#FF3366] text-white'
-                                  : 'bg-amber-400 text-slate-950'
-                                : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
-                            }`}
-                          >
-                            {lev}x {lev === 250 ? '⚡' : ''}
-                          </button>
-                        ))}
-                      </div>
+                          {pct}%
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">{t.takeProfit || 'Take Profit (Opsional):'}</span>
-                        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.tpSubHint || 'L > Entry | S < Entry'}</span>
-                      </div>
-                      <input
-                        aria-label="Take Profit"
-                        type="number"
-                        placeholder={`${t.tpPlaceholder || 'Misal:'} ${(currentPrice * 1.1).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
-                        value={tpInput}
-                        onChange={(e) => setTpInput(e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#00FF88] outline-none focus:border-[#00FF88]"
-                      />
-                      <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
-                        <span className="text-slate-500">
-                          {orderTpEst ? `${t.estProfit || 'Est. Cuan'} (${orderTpEst.plannedType}):` : `${t.estProfit || 'Est. Cuan'}:`}
-                        </span>
-                        {orderTpEst ? (
-                          <span className="font-bold text-[#00FF88]">
-                            +{formatMoney(orderTpEst.pnlDollar)} (+{orderTpEst.roiPercent.toFixed(1)}%)
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">{t.stopLoss || 'Stop Loss (Opsional):'}</span>
-                        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.slSubHint || 'L < Entry | S > Entry'}</span>
-                      </div>
-                      <input
-                        aria-label="Stop Loss"
-                        type="number"
-                        placeholder={`${t.slPlaceholder || 'Misal:'} ${(currentPrice * 0.9).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
-                        value={slInput}
-                        onChange={(e) => setSlInput(e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#FF3366] outline-none focus:border-[#FF3366]"
-                      />
-                      <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
-                        <span className="text-slate-500">
-                          {orderSlEst ? `${t.estLoss || 'Est. Rugi'} (${orderSlEst.plannedType}):` : `${t.estLoss || 'Est. Rugi'}:`}
-                        </span>
-                        {orderSlEst ? (
-                          <span className="font-bold text-[#FF3366]">
-                            {formatMoney(orderSlEst.pnlDollar)} ({orderSlEst.roiPercent.toFixed(1)}%)
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => openPosition('LONG')}
-                      className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#00FF88] to-emerald-500 hover:from-emerald-400 hover:to-[#00FF88] text-slate-950 font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#00FF88]/15 active:scale-[0.99] transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-                        <span>{t.buyLong || 'BUY / LONG'} {leverage}x</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold opacity-90">
-                        {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => openPosition('SHORT')}
-                      className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF3366] to-rose-600 hover:from-rose-500 hover:to-[#FF3366] text-white font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#FF3366]/20 active:scale-[0.99] transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
-                        <span>{t.sellShort || 'SELL / SHORT'} {leverage}x</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold opacity-90">
-                        {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
-                      </span>
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="bg-[#0B0E14] rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden flex flex-col">
-                  {/* BARIS 1: Header Ringkasan Posisi & Jarak Likuidasi */}
-                  <div className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#111622]/90 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+                      <span>{t.leverage || 'LEVERAGE'}</span>
                       <span
-                        className={`px-2.5 py-0.5 rounded-md text-[11px] font-mono font-black tracking-wide flex items-center gap-1.5 ${
-                          activePosition.type === 'LONG'
-                            ? 'bg-[#00FF88]/15 text-[#00FF88] border border-[#00FF88]/40'
-                            : 'bg-[#FF3366]/15 text-[#FF3366] border border-[#FF3366]/40'
+                        className={`font-mono font-bold ${
+                          leverage >= 250
+                            ? 'text-amber-400 animate-pulse'
+                            : leverage >= 50
+                            ? 'text-[#FF3366]'
+                            : 'text-amber-400'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${activePosition.type === 'LONG' ? 'bg-[#00FF88]' : 'bg-[#FF3366]'} animate-pulse`} />
-                        {activePosition.type} {Number(activePosition.leverage.toFixed(1))}x
-                      </span>
-                      <span className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
-                        {activePosition.pairSymbol}
-                        {activePosition.pairSymbol !== MARKET_PAIRS[selectedPairIdx]?.symbol && (
-                          <button
-                            onClick={() => {
-                              const pIdx = MARKET_PAIRS.findIndex(p => p.symbol === activePosition.pairSymbol);
-                              if (pIdx >= 0) {
-                                setSelectedPairIdx(pIdx);
-                                const liveP = marketPricesRef.current[pIdx] ?? MARKET_PAIRS[pIdx].basePrice;
-                                setCurrentPrice(liveP);
-                                const tfKey = `${pIdx}-${selectedTfIdx}`;
-                                if (!candlesticksByTfRef.current[tfKey]?.length) {
-                                  const syncMap = generateSynchronousCandlesForPair(pIdx, liveP);
-                                  candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
-                                  setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
-                                }
-                              }
-                            }}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-mono text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 cursor-pointer"
-                          >
-                            {t.openChart || 'Buka Chart'}
-                          </button>
-                        )}
-                      </span>
-                      <span className="text-xs font-mono text-slate-400">
-                        {t.posMargin || 'Margin:'} <strong className="text-slate-200 font-semibold">{formatMoney(activePosition.margin)}</strong>
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
-                        ({t.posSize || 'Size:'} {formatMoney(activePosition.margin * activePosition.leverage)})
+                        {leverage}x {leverage === 250 ? '⚡ GOD' : leverage === 100 ? '🔥 DEGEN' : ''}
                       </span>
                     </div>
+                    <div className={`grid ${activeEffects.has250xTicket || leverage === 250 ? 'grid-cols-5' : 'grid-cols-4'} gap-1.5`}>
+                      {[2, 10, 50, 100, ...(activeEffects.has250xTicket || leverage === 250 ? [250] : [])].map((lev) => (
+                        <button
+                          key={lev}
+                          onClick={() => setLeverage(lev)}
+                          className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                            leverage === lev
+                              ? lev >= 250
+                                ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
+                                : lev >= 50
+                                ? 'bg-[#FF3366] text-white'
+                                : 'bg-amber-400 text-slate-950'
+                              : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {lev}x {lev === 250 ? '⚡' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-                    <div className="flex items-center gap-2 text-xs font-mono">
-                      <span className="text-slate-400 text-[11px]">{t.posLiq || 'Liq:'}</span>
-                      <span className="text-[#FF3366] font-bold">
-                        {formatPairPrice(activePosition.liqPrice, getPairPrecision(activePosition.pairSymbol, activePosition.liqPrice))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">{t.takeProfit || 'Take Profit (Opsional):'}</span>
+                      <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.tpSubHint || 'L > Entry | S < Entry'}</span>
+                    </div>
+                    <input
+                      aria-label="Take Profit"
+                      type="number"
+                      placeholder={`${t.tpPlaceholder || 'Misal:'} ${(currentPrice * 1.1).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
+                      value={tpInput}
+                      onChange={(e) => setTpInput(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#00FF88] outline-none focus:border-[#00FF88]"
+                    />
+                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
+                      <span className="text-slate-500">
+                        {orderTpEst ? `${t.estProfit || 'Est. Cuan'} (${orderTpEst.plannedType}):` : `${t.estProfit || 'Est. Cuan'}:`}
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/25 font-bold">
-                        {Math.abs((((livePositionStats?.posPrice || currentPrice) - activePosition.liqPrice) / (livePositionStats?.posPrice || currentPrice)) * 100).toFixed(1)}% {t.posAway || 'away'}
-                      </span>
+                      {orderTpEst ? (
+                        <span className="font-bold text-[#00FF88]">
+                          +{formatMoney(orderTpEst.pnlDollar)} (+{orderTpEst.roiPercent.toFixed(1)}%)
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* BARIS 2: Area Detail (Target di Kiri, PnL di Tengah, Tombol Aksi di Kanan) */}
-                  <div className="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-center">
-                    {/* Target & Entry Price */}
-                    <div className="sm:col-span-5 flex flex-col gap-1.5">
-                      {(() => {
-                        const posPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-                        return (
-                          <>
-                            <div className="flex items-center justify-between sm:justify-start gap-3 text-xs font-mono">
-                              <span className="text-slate-400 text-[11px]">{t.posEntry || 'Harga Entry:'}</span>
-                              <span className="text-sky-300 font-bold">{formatPairPrice(activePosition.entryPrice, posPrec)}</span>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60 text-[11px] font-mono">
-                              <button
-                                type="button"
-                                onClick={() => openAdjustModal()}
-                                className="flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer text-left"
-                                title={t.posTpTitle || 'Klik untuk ubah Target Take Profit'}
-                              >
-                                <span className="text-slate-400 text-[10px] font-bold">TP:</span>
-                                {activePosition.tpPrice ? (
-                                  <span className="text-[#00FF88] font-bold flex items-center gap-1">
-                                    {formatPairPrice(activePosition.tpPrice, posPrec)}
-                                    {activePosTpEst && (
-                                      <span className="text-[10px] text-emerald-400 font-semibold opacity-90">
-                                        (+{formatMoney(activePosTpEst.pnlDollar)})
-                                      </span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500 font-normal">{t.posNotSet || 'Tidak diatur'}</span>
-                                )}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => openAdjustModal()}
-                                className="flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer text-left"
-                                title={t.posSlTitle || 'Klik untuk ubah Stop Loss'}
-                              >
-                                <span className="text-slate-400 text-[10px] font-bold">SL:</span>
-                                {activePosition.slPrice ? (
-                                  <span className="text-amber-400 font-bold flex items-center gap-1">
-                                    {formatPairPrice(activePosition.slPrice, posPrec)}
-                                    {activePosSlEst && (
-                                      <span className="text-[10px] text-rose-400 font-semibold opacity-90">
-                                        ({formatMoney(activePosSlEst.pnlDollar)})
-                                      </span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500 font-normal">{t.posNotSet || 'Tidak diatur'}</span>
-                                )}
-                              </button>
-                            </div>
-                          </>
-                        );
-                      })()}
+                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">{t.stopLoss || 'Stop Loss (Opsional):'}</span>
+                      <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.slSubHint || 'L < Entry | S > Entry'}</span>
                     </div>
+                    <input
+                      aria-label="Stop Loss"
+                      type="number"
+                      placeholder={`${t.slPlaceholder || 'Misal:'} ${(currentPrice * 0.9).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
+                      value={slInput}
+                      onChange={(e) => setSlInput(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#FF3366] outline-none focus:border-[#FF3366]"
+                    />
+                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
+                      <span className="text-slate-500">
+                        {orderSlEst ? `${t.estLoss || 'Est. Rugi'} (${orderSlEst.plannedType}):` : `${t.estLoss || 'Est. Rugi'}:`}
+                      </span>
+                      {orderSlEst ? (
+                        <span className="font-bold text-[#FF3366]">
+                          {formatMoney(orderSlEst.pnlDollar)} ({orderSlEst.roiPercent.toFixed(1)}%)
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Unrealized PnL Lega di Tengah */}
-                    <div className="sm:col-span-4 flex flex-col items-start sm:items-center justify-center py-1 sm:py-0 sm:border-x sm:border-slate-800/70 sm:px-2">
-                      <div className="text-[10px] uppercase text-slate-400 font-mono tracking-wider font-semibold">
-                        {t.unrealizedPnl || 'Unrealized PnL'}
-                      </div>
-                      <div
-                        className={`text-lg sm:text-xl font-mono font-black tracking-tight ${
-                          livePositionStats.pnlDollar >= 0 ? 'text-[#00FF88]' : 'text-[#FF3366]'
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => openPosition('LONG')}
+                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#00FF88] to-emerald-500 hover:from-emerald-400 hover:to-[#00FF88] text-slate-950 font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#00FF88]/15 active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                      <span>{t.buyLong || 'BUY / LONG'} {leverage}x</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold opacity-90">
+                      {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => openPosition('SHORT')}
+                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF3366] to-rose-600 hover:from-rose-500 hover:to-[#FF3366] text-white font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#FF3366]/20 active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
+                      <span>{t.sellShort || 'SELL / SHORT'} {leverage}x</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold opacity-90">
+                      {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* DAFTAR POSISI TERBUKA (MULTI-POSITION TRADING LIST) */}
+              {activePositions.length > 0 && (
+                <div className="flex flex-col gap-3 pt-3 border-t border-slate-800/80">
+                  {/* Header Ringkasan & Tombol Tutup Semua Posisi */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono font-black text-white tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        {t.openPositionsTitle || 'POSISI TERBUKA'} ({activePositions.length}/5)
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
+                          totalPositionsStats.totalPnl >= 0
+                            ? 'bg-emerald-500/15 text-[#00FF88] border border-emerald-500/30'
+                            : 'bg-rose-500/15 text-[#FF3366] border border-rose-500/30'
                         }`}
                       >
-                        {livePositionStats.pnlDollar >= 0 ? '+' : ''}
-                        {formatMoney(livePositionStats.pnlDollar)}{' '}
-                        <span className="text-xs font-bold opacity-90">
-                          ({livePositionStats.pnlDollar >= 0 ? '+' : ''}{livePositionStats.roiPercent.toFixed(1)}%)
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono mt-1 text-slate-400">
-                        <span
-                          className={`px-2 py-0.5 rounded font-semibold ${
-                            livePositionStats.roiPercent >= 0
-                              ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
-                              : 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
-                          }`}
-                          title={t.purePriceRoiTooltip || 'Keuntungan / kerugian murni dari selisih harga pasar (100% Price Action)'}
-                        >
-                          {t.priceRoi || 'Price ROI:'} {livePositionStats.roiPercent >= 0 ? '+' : ''}
-                          {livePositionStats.roiPercent.toFixed(2)}%
-                        </span>
-                      </div>
+                        {totalPositionsStats.totalPnl >= 0 ? '+' : ''}{formatMoney(totalPositionsStats.totalPnl)} (
+                        {totalPositionsStats.totalRoiPercent >= 0 ? '+' : ''}{totalPositionsStats.totalRoiPercent.toFixed(1)}%)
+                      </span>
                     </div>
 
-                    {/* Tombol Aksi di Kanan */}
-                    <div className="sm:col-span-3 flex items-center justify-end w-full pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/70">
+                    {activePositions.length >= 2 && (
                       <button
-                        onClick={() => closePosition(false)}
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-amber-400/20 cursor-pointer shrink-0 transition-all active:scale-95 whitespace-nowrap"
+                        onClick={closeAllPositions}
+                        className="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-rose-200 border border-rose-500/40 text-[11px] font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95"
                       >
-                        {t.closePosition || 'Close / TP'}
+                        {t.closeAllPositions || 'Tutup Semua Posisi'}
                       </button>
-                    </div>
+                    )}
+                  </div>
+
+                  {/* List Cards Posisi Terbuka */}
+                  <div className="flex flex-col gap-3">
+                    {activePositions.map((pos) => {
+                      const stats = getPositionLiveStats(pos);
+                      const pnl = stats?.pnlDollar ?? 0;
+                      const roi = stats?.roiPercent ?? 0;
+                      const posPrec = getPairPrecision(pos.pairSymbol, pos.entryPrice);
+                      const currentPairSymbol = MARKET_PAIRS[selectedPairIdx]?.symbol;
+                      const isCurrentPair = pos.pairSymbol === currentPairSymbol;
+                      const awayPct = Math.abs((((stats?.posPrice || currentPrice) - pos.liqPrice) / (stats?.posPrice || currentPrice)) * 100).toFixed(1);
+
+                      return (
+                        <div key={pos.id} className="bg-[#0B0E14] rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden flex flex-col">
+                          {/* BARIS 1: Header Ringkasan Posisi & Jarak Likuidasi */}
+                          <div className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#111622]/90 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-md text-[11px] font-mono font-black tracking-wide flex items-center gap-1.5 ${
+                                  pos.type === 'LONG'
+                                    ? 'bg-[#00FF88]/15 text-[#00FF88] border border-[#00FF88]/40'
+                                    : 'bg-[#FF3366]/15 text-[#FF3366] border border-[#FF3366]/40'
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${pos.type === 'LONG' ? 'bg-[#00FF88]' : 'bg-[#FF3366]'} animate-pulse`} />
+                                {pos.type} {Number(pos.leverage.toFixed(1))}x
+                              </span>
+                              <span className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+                                {pos.pairSymbol}
+                                {!isCurrentPair && (
+                                  <button
+                                    onClick={() => {
+                                      const pIdx = MARKET_PAIRS.findIndex(p => p.symbol === pos.pairSymbol);
+                                      if (pIdx >= 0) {
+                                        setSelectedPairIdx(pIdx);
+                                        const liveP = marketPricesRef.current[pIdx] ?? MARKET_PAIRS[pIdx].basePrice;
+                                        setCurrentPrice(liveP);
+                                        const tfKey = `${pIdx}-${selectedTfIdx}`;
+                                        if (!candlesticksByTfRef.current[tfKey]?.length) {
+                                          const syncMap = generateSynchronousCandlesForPair(pIdx, liveP);
+                                          candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+                                          setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
+                                        }
+                                      }
+                                    }}
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-mono text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 cursor-pointer"
+                                  >
+                                    {t.openChart || 'Buka Chart'}
+                                  </button>
+                                )}
+                              </span>
+                              <span className="text-xs font-mono text-slate-400">
+                                {t.posMargin || 'Margin:'} <strong className="text-slate-200 font-semibold">{formatMoney(pos.margin)}</strong>
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                                ({t.posSize || 'Size:'} {formatMoney(pos.margin * pos.leverage)})
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs font-mono">
+                              <span className="text-slate-400 text-[11px]">{t.posLiq || 'Liq:'}</span>
+                              <span className="text-[#FF3366] font-bold">
+                                {formatPairPrice(pos.liqPrice, getPairPrecision(pos.pairSymbol, pos.liqPrice))}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/25 font-bold">
+                                {awayPct}% {t.posAway || 'away'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* BARIS 2: Area Detail (Target di Kiri, PnL di Tengah, Tombol Aksi di Kanan) */}
+                          <div className="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-center">
+                            {/* Target & Entry Price */}
+                            <div className="sm:col-span-5 flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between sm:justify-start gap-3 text-xs font-mono">
+                                <span className="text-slate-400 text-[11px]">{t.posEntry || 'Harga Entry:'}</span>
+                                <span className="text-sky-300 font-bold">{formatPairPrice(pos.entryPrice, posPrec)}</span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60 text-[11px] font-mono">
+                                <button
+                                  type="button"
+                                  onClick={() => openAdjustModal(pos)}
+                                  className="flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer text-left"
+                                  title={t.posTpTitle || 'Klik untuk ubah Target Take Profit'}
+                                >
+                                  <span className="text-slate-400 text-[10px] font-bold">TP:</span>
+                                  {pos.tpPrice ? (
+                                    <span className="text-[#00FF88] font-bold flex items-center gap-1">
+                                      {formatPairPrice(pos.tpPrice, posPrec)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 font-normal">{t.posNotSet || 'Tidak diatur'}</span>
+                                  )}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => openAdjustModal(pos)}
+                                  className="flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer text-left"
+                                  title={t.posSlTitle || 'Klik untuk ubah Stop Loss'}
+                                >
+                                  <span className="text-slate-400 text-[10px] font-bold">SL:</span>
+                                  {pos.slPrice ? (
+                                    <span className="text-amber-400 font-bold flex items-center gap-1">
+                                      {formatPairPrice(pos.slPrice, posPrec)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 font-normal">{t.posNotSet || 'Tidak diatur'}</span>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Unrealized PnL Lega di Tengah */}
+                            <div className="sm:col-span-4 flex flex-col items-start sm:items-center justify-center py-1 sm:py-0 sm:border-x sm:border-slate-800/70 sm:px-2">
+                              <div className="text-[10px] uppercase text-slate-400 font-mono tracking-wider font-semibold">
+                                {t.unrealizedPnl || 'Unrealized PnL'}
+                              </div>
+                              <div
+                                className={`text-lg sm:text-xl font-mono font-black tracking-tight ${
+                                  pnl >= 0 ? 'text-[#00FF88]' : 'text-[#FF3366]'
+                                }`}
+                              >
+                                {pnl >= 0 ? '+' : ''}
+                                {formatMoney(pnl)}{' '}
+                                <span className="text-xs font-bold opacity-90">
+                                  ({pnl >= 0 ? '+' : ''}{roi.toFixed(1)}%)
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono mt-1 text-slate-400">
+                                <span
+                                  className={`px-2 py-0.5 rounded font-semibold ${
+                                    roi >= 0
+                                      ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                                      : 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
+                                  }`}
+                                  title={t.purePriceRoiTooltip || 'Keuntungan / kerugian murni dari selisih harga pasar (100% Price Action)'}
+                                >
+                                  {t.priceRoi || 'Price ROI:'} {roi >= 0 ? '+' : ''}
+                                  {roi.toFixed(2)}%
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Tombol Aksi di Kanan */}
+                            <div className="sm:col-span-3 flex items-center justify-end w-full pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/70">
+                              <button
+                                onClick={() => closePositionById(pos.id, false)}
+                                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-amber-400/20 cursor-pointer shrink-0 transition-all active:scale-95 whitespace-nowrap"
+                              >
+                                {t.closePosition || 'Close / TP'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -7641,7 +7862,7 @@ function TradingGame() {
       )}
 
       {/* MODAL ATUR TP & SL POSISI AKTIF */}
-      {isAdjustModalOpen && activePosition && (
+      {isAdjustModalOpen && modalPosition && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#111622] border border-slate-700/80 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
             {/* Header */}
@@ -7653,10 +7874,10 @@ function TradingGame() {
                 <div>
                   <h3 className="text-sm sm:text-base font-extrabold text-white">{t.adjustModalTitle || 'Atur TP & SL Posisi'}</h3>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    <span className={activePosition.type === 'LONG' ? 'text-[#00FF88] font-bold' : 'text-[#FF3366] font-bold'}>
-                      {activePosition.type} {Number(activePosition.leverage.toFixed(1))}x
+                    <span className={modalPosition.type === 'LONG' ? 'text-[#00FF88] font-bold' : 'text-[#FF3366] font-bold'}>
+                      {modalPosition.type} {Number(modalPosition.leverage.toFixed(1))}x
                     </span>{' '}
-                    • {activePosition.pairSymbol}
+                    • {modalPosition.pairSymbol}
                   </p>
                 </div>
               </div>
@@ -7671,20 +7892,20 @@ function TradingGame() {
 
             {/* Info Ringkas */}
             {(() => {
-              const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+              const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
               return (
                 <div className="grid grid-cols-3 gap-2 bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 text-center font-mono text-[11px]">
                   <div>
                     <span className="text-slate-500 text-[10px] block">{t.adjustModalEntry || 'Entry'}</span>
-                    <span className="text-sky-300 font-bold">{formatPairPrice(activePosition.entryPrice, modalPrec)}</span>
+                    <span className="text-sky-300 font-bold">{formatPairPrice(modalPosition.entryPrice, modalPrec)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] block">{t.adjustModalMargin || 'Margin'}</span>
-                    <span className="text-slate-200 font-semibold">{formatMoney(activePosition.margin)}</span>
+                    <span className="text-slate-200 font-semibold">{formatMoney(modalPosition.margin)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] block">{t.adjustModalLiq || 'Likuidasi'}</span>
-                    <span className="text-[#FF3366] font-bold">{formatPairPrice(activePosition.liqPrice, modalPrec)}</span>
+                    <span className="text-[#FF3366] font-bold">{formatPairPrice(modalPosition.liqPrice, modalPrec)}</span>
                   </div>
                 </div>
               );
@@ -7716,12 +7937,12 @@ function TradingGame() {
               </div>
               <div className="relative">
                 {(() => {
-                  const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+                  const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
                   return (
                     <input
                       type="number"
                       step="any"
-                      placeholder={activePosition.type === 'LONG' ? `> ${activePosition.entryPrice.toFixed(modalPrec)}` : `< ${activePosition.entryPrice.toFixed(modalPrec)}`}
+                      placeholder={modalPosition.type === 'LONG' ? `> ${modalPosition.entryPrice.toFixed(modalPrec)}` : `< ${modalPosition.entryPrice.toFixed(modalPrec)}`}
                       value={adjustTpInput}
                       onChange={(e) => { setAdjustTpInput(e.target.value); setAdjustError(''); }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-[#00FF88] outline-none focus:border-[#00FF88]"
@@ -7760,8 +7981,8 @@ function TradingGame() {
                 ) : (
                   <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-400">
                     {language === 'en'
-                      ? `TP for ${activePosition.type} must be ${activePosition.type === 'LONG' ? 'above' : 'below'} entry (${formatPairPrice(activePosition.entryPrice, getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice))})`
-                      : `TP untuk ${activePosition.type} harus ${activePosition.type === 'LONG' ? 'di atas' : 'di bawah'} entry (${formatPairPrice(activePosition.entryPrice, getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice))})`}
+                      ? `TP for ${modalPosition.type} must be ${modalPosition.type === 'LONG' ? 'above' : 'below'} entry (${formatPairPrice(modalPosition.entryPrice, getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice))})`
+                      : `TP untuk ${modalPosition.type} harus ${modalPosition.type === 'LONG' ? 'di atas' : 'di bawah'} entry (${formatPairPrice(modalPosition.entryPrice, getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice))})`}
                   </div>
                 )
               )}
@@ -7786,12 +8007,12 @@ function TradingGame() {
               </div>
               <div className="relative">
                 {(() => {
-                  const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+                  const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
                   return (
                     <input
                       type="number"
                       step="any"
-                      placeholder={activePosition.type === 'LONG' ? `< ${activePosition.entryPrice.toFixed(modalPrec)}` : `> ${activePosition.entryPrice.toFixed(modalPrec)}`}
+                      placeholder={modalPosition.type === 'LONG' ? `< ${modalPosition.entryPrice.toFixed(modalPrec)}` : `> ${modalPosition.entryPrice.toFixed(modalPrec)}`}
                       value={adjustSlInput}
                       onChange={(e) => { setAdjustSlInput(e.target.value); setAdjustError(''); }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-[#FF3366] outline-none focus:border-[#FF3366]"
@@ -7806,8 +8027,8 @@ function TradingGame() {
                 <button
                   type="button"
                   onClick={() => {
-                    const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
-                    setAdjustSlInput(activePosition.entryPrice.toFixed(modalPrec));
+                    const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
+                    setAdjustSlInput(modalPosition.entryPrice.toFixed(modalPrec));
                     setAdjustError('');
                   }}
                   className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 cursor-pointer transition-colors"
@@ -7868,22 +8089,23 @@ function TradingGame() {
                 ) : (
                   <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-400">
                     {(() => {
-                      const modalPrec = getPairPrecision(activePosition.pairSymbol, activePosition.entryPrice);
+                      const modalPrec = getPairPrecision(modalPosition.pairSymbol, modalPosition.entryPrice);
                       if (modalSlEst.isLiqBreached) {
                         return language === 'en'
-                          ? `SL cannot breach liquidation price (${formatPairPrice(activePosition.liqPrice, modalPrec)})`
-                          : `SL tidak boleh melewati harga likuidasi (${formatPairPrice(activePosition.liqPrice, modalPrec)})`;
+                          ? `SL cannot breach liquidation price (${formatPairPrice(modalPosition.liqPrice, modalPrec)})`
+                          : `SL tidak boleh melewati harga likuidasi (${formatPairPrice(modalPosition.liqPrice, modalPrec)})`;
                       }
                       if (modalSlEst.isCurrentPriceBreached) {
-                        const curP = marketPricesRef.current[selectedPairIdx] || activePosition.entryPrice;
+                        const posPairIdx = MARKET_PAIRS.findIndex(p => p.symbol === modalPosition.pairSymbol);
+                        const curP = (posPairIdx >= 0 && marketPricesRef.current[posPairIdx]) || modalPosition.entryPrice;
                         return language === 'en'
-                          ? `SL cannot be ${activePosition.type === 'LONG' ? 'above/equal to' : 'below/equal to'} current market price (${formatPairPrice(curP, modalPrec)})`
-                          : `SL tidak boleh ${activePosition.type === 'LONG' ? 'di atas/sama dengan' : 'di bawah/sama dengan'} harga pasar sekarang (${formatPairPrice(curP, modalPrec)}) karena akan langsung tereksekusi.`;
+                          ? `SL cannot be ${modalPosition.type === 'LONG' ? 'above/equal to' : 'below/equal to'} current market price (${formatPairPrice(curP, modalPrec)})`
+                          : `SL tidak boleh ${modalPosition.type === 'LONG' ? 'di atas/sama dengan' : 'di bawah/sama dengan'} harga pasar sekarang (${formatPairPrice(curP, modalPrec)}) karena akan langsung tereksekusi.`;
                       }
                       if (modalSlEst.isTpBreached) {
                         return language === 'en'
-                          ? `SL cannot cross TP (${formatPairPrice(activePosition.tpPrice, modalPrec)})`
-                          : `SL tidak boleh melewati TP (${formatPairPrice(activePosition.tpPrice, modalPrec)})`;
+                          ? `SL cannot cross TP (${formatPairPrice(modalPosition.tpPrice, modalPrec)})`
+                          : `SL tidak boleh melewati TP (${formatPairPrice(modalPosition.tpPrice, modalPrec)})`;
                       }
                       return language === 'en' ? 'Invalid SL price' : 'Harga SL tidak valid';
                     })()}

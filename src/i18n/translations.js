@@ -78,8 +78,13 @@ export const TRANSLATIONS = {
     openingTax: 'Pajak Buka Posisi (1.5%)',
     orderFeeNote: 'Pajak 1.5% dari margin saat buka posisi. Likuidasi terjadi jika ROI mencapai -92%.',
 
-    // Active Position Card
+    // Active Position Card & Multi-Position
     activePosition: 'POSISI TERBUKA',
+    openPositionsTitle: 'POSISI TERBUKA',
+    closeAllPositions: 'Tutup Semua Posisi',
+    maxPositionsAlert: 'Maksimal 5 posisi terbuka secara bersamaan!',
+    slotsLeft: 'Slot Posisi',
+    totalUnrealizedPnl: 'Total PnL Terbuka',
     posTypeLong: 'LONG',
     posTypeShort: 'SHORT',
     openChart: 'Buka Chart',
@@ -641,8 +646,13 @@ export const TRANSLATIONS = {
     openingTax: 'Opening Fee (1.5%)',
     orderFeeNote: '1.5% fee deducted from margin on entry. Liquidation triggers if ROI hits -92%.',
 
-    // Active Position Card
+    // Active Position Card & Multi-Position
     activePosition: 'OPEN POSITION',
+    openPositionsTitle: 'OPEN POSITIONS',
+    closeAllPositions: 'Close All Positions',
+    maxPositionsAlert: 'Maximum 5 active positions reached!',
+    slotsLeft: 'Position Slots',
+    totalUnrealizedPnl: 'Total Open PnL',
     posTypeLong: 'LONG',
     posTypeShort: 'SHORT',
     openChart: 'Open Chart',
