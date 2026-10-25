@@ -28,12 +28,14 @@ export const ADS_CONFIG = {
     sponsorTagline: 'Mitra Likuiditas Global Mendanai Ekosistem Trading & Pertumbuhan Trader'
   },
 
-  // Konfigurasi Monetag (resmi terhubung dengan direct link & vignette publisher)
+  // Konfigurasi Monetag (resmi terhubung dengan direct link, vignette, & onclick popunder)
   monetag: {
     directLinkUrl: 'https://uplcm.com/4/12106307',
     directLinkZoneId: '12106307',
     vignetteZoneId: '12106783',
-    scriptUrl: 'https://n6wxm.com/vignette.min.js'
+    scriptUrl: 'https://n6wxm.com/vignette.min.js',
+    onClickZoneId: '12121486',
+    onClickScriptUrl: 'https://al5sm.com/tag.min.js'
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)
