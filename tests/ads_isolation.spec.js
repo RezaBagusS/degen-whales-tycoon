@@ -38,4 +38,13 @@ test.describe('Ads Isolation Verification', () => {
     expect(scripts.some((src) => src.includes('vignette.min.js'))).toBe(false);
     expect(scripts.some((src) => src.includes('al5sm.com') || src.includes('alwingulla.com'))).toBe(false);
   });
+
+  test('Monetag OnClick suppresses script if within 4-hour interval', async ({ page }) => {
+    // Seed localStorage with a timestamp from 1 hour ago (< 4 hours cooldown)
+    await page.addInitScript(() => {
+      localStorage.setItem('degen_monetag_onclick_last_ts', String(Date.now() - 3600000));
+    });
+    await page.goto('/');
+    await expect(page.locator('#monetag-onclick-script')).toHaveCount(0);
+  });
 });

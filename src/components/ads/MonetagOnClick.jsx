@@ -29,10 +29,30 @@ export default function MonetagOnClick() {
       return;
     }
 
+    const STORAGE_KEY = 'degen_monetag_onclick_last_ts';
+    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 4;
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+
+    // Cek batas frekuensi waktu terakhir iklan muncul
+    try {
+      const lastTriggered = localStorage.getItem(STORAGE_KEY);
+      if (lastTriggered) {
+        const elapsed = Date.now() - Number(lastTriggered);
+        if (elapsed < intervalMs) {
+          // Masih dalam periode jeda 4 jam, jangan muat script
+          return;
+        }
+      }
+    } catch {
+      // Abaikan jika localStorage diblokir browser
+    }
+
     const SCRIPT_ID = 'monetag-onclick-script';
     if (document.getElementById(SCRIPT_ID)) {
       return;
     }
+
+    let cleanupClickListener = null;
 
     try {
       const script = document.createElement('script');
@@ -45,12 +65,28 @@ export default function MonetagOnClick() {
       const target = [document.documentElement, document.body].filter(Boolean).pop();
       if (target) {
         target.appendChild(script);
+
+        // Catat waktu klik pertama saat popunder terpicu
+        const onFirstUserClick = () => {
+          try {
+            localStorage.setItem(STORAGE_KEY, String(Date.now()));
+          } catch {}
+          window.removeEventListener('click', onFirstUserClick, true);
+        };
+
+        window.addEventListener('click', onFirstUserClick, true);
+        cleanupClickListener = () => {
+          window.removeEventListener('click', onFirstUserClick, true);
+        };
       }
     } catch {
       // Fail silently if blocked by adblocker
     }
 
     return () => {
+      if (cleanupClickListener) {
+        cleanupClickListener();
+      }
       const existing = document.getElementById(SCRIPT_ID);
       if (existing && existing.parentNode) {
         existing.parentNode.removeChild(existing);
