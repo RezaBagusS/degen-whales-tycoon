@@ -141,12 +141,45 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     });
     expect(unauth.status()).toBe(401);
 
-    // Invalid action
     const invalidAction = await request.post('/api/admin/player-action', {
       headers: { 'x-admin-key': adminKey },
       data: { action: 'invalid_action', userId: 'user-xyz' }
     });
     expect(invalidAction.status()).toBe(400);
+  });
+
+  test('opens player detail modal and switches tools via dropdown', async ({ page }) => {
+    await page.goto('/admin');
+    await page.locator('input[type="password"]').fill(adminKey);
+    await page.getByRole('button', { name: /Buka Dashboard Ops/i }).click();
+
+    // Go to Whale Watcher tab
+    await page.getByRole('button', { name: /Whale Watcher/i }).click();
+    await expect(page.getByText('Whale Watcher & Player CRM')).toBeVisible();
+
+    // Click on the first player's Detail button
+    const detailBtn = page.getByRole('button', { name: 'Detail' }).first();
+    await expect(detailBtn).toBeVisible();
+    await detailBtn.click();
+
+    // Verify modal header and dropdown
+    await expect(page.getByText(/Detail Pemain: @/i)).toBeVisible();
+    const dropdown = page.locator('#mod-action-dropdown');
+    await expect(dropdown).toBeVisible();
+
+    // Select "Ganti / Reset Password Pemain"
+    await dropdown.selectOption('password');
+    await expect(page.getByText('Admin Reset Password Pemain')).toBeVisible();
+    await expect(page.getByPlaceholder(/Ketik password baru/i)).toBeVisible();
+
+    // Select "Suntik Kas & Whale Tokens (Kompensasi)"
+    await dropdown.selectOption('compensation');
+    await expect(page.getByText(/Suntik Kas & Tokens/i)).toBeVisible();
+    await expect(page.getByPlaceholder('Contoh: 500')).toBeVisible();
+
+    // Close modal
+    await page.getByRole('button', { name: 'Tutup', exact: true }).last().click();
+    await expect(page.getByText(/Detail Pemain: @/i)).not.toBeVisible();
   });
 });
 

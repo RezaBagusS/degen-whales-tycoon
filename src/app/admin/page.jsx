@@ -33,7 +33,8 @@ import {
   Ban,
   Gift,
   RotateCcw,
-  BarChart2
+  BarChart2,
+  ChevronDown
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -392,6 +393,7 @@ export default function AdminDashboard() {
   const [compReason, setCompReason] = useState('');
   const [modActionLoading, setModActionLoading] = useState(false);
   const [modActionMsg, setModActionMsg] = useState(null);
+  const [activeModTool, setActiveModTool] = useState(''); // '' | 'password' | 'ban' | 'compensation' | 'reset'
 
   // Load saved admin key from sessionStorage on mount
   useEffect(() => {
@@ -1484,8 +1486,14 @@ export default function AdminDashboard() {
                             <button
                               onClick={() => {
                                 setSelectedPlayer(player);
+                                setActiveModTool(player.isBanned ? 'ban' : '');
                                 setAdminResetMsg(null);
                                 setAdminNewPassword('');
+                                setModActionMsg(null);
+                                setBanReasonInput(player.banReason || '');
+                                setCompCash('');
+                                setCompTokens('');
+                                setCompReason('');
                               }}
                               className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
                             >
@@ -1523,272 +1531,371 @@ export default function AdminDashboard() {
 
             {/* Modal Detail Pemain */}
             {selectedPlayer && (
-              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-[#0B0F19] border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div>
-                      <h3 className="font-mono font-bold text-base text-white flex items-center gap-2">
-                        <span>Detail Pemain: @{selectedPlayer.username}</span>
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto">
+                <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl flex flex-col my-auto max-h-[90vh] overflow-hidden">
+                  
+                  {/* Sticky Header */}
+                  <div className="flex items-center justify-between border-b border-slate-800 px-5 sm:px-6 py-4 bg-[#0B0F19]/95 backdrop-blur-sm shrink-0">
+                    <div className="min-w-0 pr-3">
+                      <h3 className="font-mono font-bold text-sm sm:text-base text-white flex items-center gap-2 flex-wrap">
+                        <span className="truncate">Detail Pemain: @{selectedPlayer.username}</span>
                         {selectedPlayer.isOnline ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00FF88] border border-emerald-500/30">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00FF88] border border-emerald-500/30 shrink-0">
                             Online Sekarang
                           </span>
                         ) : selectedPlayer.isActive24h ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 shrink-0">
                             Aktif 24 Jam
                           </span>
                         ) : null}
                       </h3>
-                      <span className="text-[11px] font-mono text-slate-400">ID: {selectedPlayer.id}</span>
+                      <span className="text-[11px] font-mono text-slate-400 block truncate">ID: {selectedPlayer.id}</span>
                     </div>
                     <button
-                      onClick={() => setSelectedPlayer(null)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                      onClick={() => {
+                        setSelectedPlayer(null);
+                        setActiveModTool('');
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer shrink-0 transition-colors"
+                      title="Tutup Modal"
+                      aria-label="Tutup"
                     >
-                      ✕
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Saldo Tunai:</span>
-                      <strong className="text-[#00FF88] text-sm">{formatMoney(selectedPlayer.cash)}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Peak Net Worth:</span>
-                      <strong className="text-white text-sm">{formatMoney(selectedPlayer.peakNetWorth)}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Whale Tokens:</span>
-                      <strong className="text-amber-400 text-sm">{selectedPlayer.whaleTokens}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Posisi Aktif:</span>
-                      <strong className="text-sky-400 text-sm">{selectedPlayer.activePositionsCount} Posisi</strong>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-[11px] font-mono font-bold text-slate-400 uppercase mb-2">Inventaris Black Market</h4>
-                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between">
-                        <span className="text-slate-400">Pump Whistle:</span>
-                        <strong className="text-white">{selectedPlayer.inventory?.pump_whistle || 0}</strong>
+                  {/* Scrollable Body */}
+                  <div className="overflow-y-auto px-5 sm:px-6 py-4 space-y-4 font-mono">
+                    {/* Ringkasan Saldo & Metrik */}
+                    <div className="grid grid-cols-2 gap-2.5 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block mb-0.5 text-[11px]">Saldo Tunai:</span>
+                        <strong className="text-[#00FF88] text-sm">{formatMoney(selectedPlayer.cash)}</strong>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between">
-                        <span className="text-slate-400">Dump Horn:</span>
-                        <strong className="text-white">{selectedPlayer.inventory?.dump_horn || 0}</strong>
+                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block mb-0.5 text-[11px]">Peak Net Worth:</span>
+                        <strong className="text-white text-sm">{formatMoney(selectedPlayer.peakNetWorth)}</strong>
                       </div>
-                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between">
-                        <span className="text-slate-400">Liq Shield:</span>
-                        <strong className="text-white">{selectedPlayer.inventory?.liq_shield || 0}</strong>
+                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block mb-0.5 text-[11px]">Whale Tokens:</span>
+                        <strong className="text-amber-400 text-sm">{selectedPlayer.whaleTokens}</strong>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block mb-0.5 text-[11px]">Posisi Aktif:</span>
+                        <strong className="text-sky-400 text-sm">{selectedPlayer.activePositionsCount} Posisi</strong>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Admin Reset Password Section */}
-                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5" />
-                        Admin Reset Password Pemain
-                      </span>
-                      {selectedPlayer.email && (
-                        <span className="text-[10px] font-mono text-slate-400">Email: {selectedPlayer.email}</span>
-                      )}
+                    {/* Inventaris Black Market */}
+                    <div>
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-wider">Inventaris Black Market</h4>
+                      <div className="grid grid-cols-3 gap-2 text-[11px]">
+                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Pump Whistle:</span>
+                          <strong className="text-white text-xs">{selectedPlayer.inventory?.pump_whistle || 0}</strong>
+                        </div>
+                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Dump Horn:</span>
+                          <strong className="text-white text-xs">{selectedPlayer.inventory?.dump_horn || 0}</strong>
+                        </div>
+                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Liq Shield:</span>
+                          <strong className="text-white text-xs">{selectedPlayer.inventory?.liq_shield || 0}</strong>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-tight">
-                      Ganti langsung password akun @{selectedPlayer.username} jika pemain lupa password atau meminta bantuan melalui support.
-                    </p>
 
-                    {adminResetMsg && (
-                      <div className={`p-2 rounded-lg text-xs font-mono ${adminResetMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
-                        {adminResetMsg.text}
+                    {/* DROPDOWN SELECTOR: Aksi & Moderasi Pemain */}
+                    <div className="pt-2 border-t border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="mod-action-dropdown" className="text-xs font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
+                          Pilih Tindakan Moderasi &amp; Support:
+                        </label>
+                        {selectedPlayer.isBanned ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
+                            🚫 TERBLOKIR
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/20">
+                            ● Normal
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <select
+                          id="mod-action-dropdown"
+                          value={activeModTool}
+                          onChange={(e) => {
+                            setActiveModTool(e.target.value);
+                            setAdminResetMsg(null);
+                            setModActionMsg(null);
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-white outline-none focus:border-cyan-400 cursor-pointer transition-colors appearance-none pr-9 shadow-inner"
+                        >
+                          <option value="">-- Pilih Aksi / Fitur Support (Dropdown) --</option>
+                          <option value="password">🔑 Ganti / Reset Password Pemain</option>
+                          <option value="ban">
+                            {selectedPlayer.isBanned ? '✅ Status Banned & Buka Blokir (Unban)' : '🚫 Status Akun & Suspend / Blokir'}
+                          </option>
+                          <option value="compensation">🎁 Suntik Kas &amp; Whale Tokens (Kompensasi)</option>
+                          <option value="reset">🔄 Reset Progres Pemain ke Awal ($100)</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Placeholder info when no tool is chosen */}
+                    {!activeModTool && (
+                      <div className="p-3 rounded-xl bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-400 leading-relaxed">
+                        {selectedPlayer.isBanned ? (
+                          <div className="flex items-center justify-between text-left gap-2 text-rose-300">
+                            <span className="text-[11px]">
+                              ⚠️ Akun @{selectedPlayer.username} sedang disuspend: &ldquo;{selectedPlayer.banReason || 'Pelanggaran fair play'}&rdquo;
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveModTool('ban')}
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-[10px] font-bold text-white shrink-0 cursor-pointer"
+                            >
+                              Buka Unban
+                            </button>
+                          </div>
+                        ) : (
+                          <span>Gunakan dropdown di atas untuk mereset password, suspend akun, menyuntikkan kas kompensasi, atau mereset progres akun @{selectedPlayer.username}.</span>
+                        )}
                       </div>
                     )}
 
-                    <form onSubmit={handleAdminResetPassword} className="flex items-center gap-2 pt-1">
-                      <div className="relative flex-1">
-                        <input
-                          type={showAdminPass ? 'text' : 'password'}
-                          placeholder="Ketik password baru (min. 6 karakter)"
-                          value={adminNewPassword}
-                          onChange={(e) => setAdminNewPassword(e.target.value)}
-                          className="w-full pl-3 pr-8 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowAdminPass(!showAdminPass)}
-                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
-                        >
-                          {showAdminPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={adminResetLoading || !adminNewPassword}
-                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
-                      >
-                        {adminResetLoading ? 'Mereset...' : 'Reset Sekarang'}
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Player Moderation: Ban & Suspend */}
-                  <div className={`p-3.5 rounded-2xl border space-y-2.5 ${selectedPlayer.isBanned ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-900/80 border-slate-800'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
-                        <Ban className="w-3.5 h-3.5" />
-                        Status Moderasi Akun
-                      </span>
-                      {selectedPlayer.isBanned ? (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
-                          🚫 TERBLOKIR / SUSPEND
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/20">
-                          ● Akun Normal
-                        </span>
-                      )}
-                    </div>
-
-                    {selectedPlayer.isBanned ? (
-                      <div className="space-y-2">
-                        <p className="text-[11px] text-rose-300">
-                          Alasan: <em>&ldquo;{selectedPlayer.banReason || 'Pelanggaran aturan game'}&rdquo;</em>
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBan(false)}
-                          disabled={modActionLoading}
-                          className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs cursor-pointer transition-all disabled:opacity-50"
-                        >
-                          {modActionLoading ? 'Memproses...' : '✅ Cabut Status Suspend (Unban)'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
+                    {/* TOOL 1: Admin Reset Password Section */}
+                    {activeModTool === 'password' && (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5" />
+                            Admin Reset Password Pemain
+                          </span>
+                          {selectedPlayer.email && (
+                            <span className="text-[10px] text-slate-400">Email: {selectedPlayer.email}</span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-slate-400 leading-tight">
-                          Blokir akses login dan penyimpanan akun ini jika dicurigai cheat atau eksploitasi sistem.
+                          Ganti langsung password akun @{selectedPlayer.username} jika pemain lupa password atau meminta bantuan melalui support.
                         </p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={banReasonInput}
-                            onChange={(e) => setBanReasonInput(e.target.value)}
-                            placeholder="Alasan suspend akun (opsional)..."
-                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 outline-none focus:border-rose-400"
-                          />
+
+                        {adminResetMsg && (
+                          <div className={`p-2 rounded-lg text-xs ${adminResetMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                            {adminResetMsg.text}
+                          </div>
+                        )}
+
+                        <form onSubmit={handleAdminResetPassword} className="flex items-center gap-2 pt-1">
+                          <div className="relative flex-1">
+                            <input
+                              type={showAdminPass ? 'text' : 'password'}
+                              placeholder="Ketik password baru (min. 6 karakter)"
+                              value={adminNewPassword}
+                              onChange={(e) => setAdminNewPassword(e.target.value)}
+                              className="w-full pl-3 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAdminPass(!showAdminPass)}
+                              className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                              title={showAdminPass ? 'Sembunyikan password' : 'Lihat password'}
+                            >
+                              {showAdminPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={adminResetLoading || !adminNewPassword}
+                            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
+                          >
+                            {adminResetLoading ? 'Mereset...' : 'Reset Sekarang'}
+                          </button>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* TOOL 2: Player Moderation: Ban & Suspend */}
+                    {activeModTool === 'ban' && (
+                      <div className={`p-3.5 rounded-2xl border space-y-2.5 animate-in fade-in duration-200 ${selectedPlayer.isBanned ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-900/80 border-slate-800'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                            <Ban className="w-3.5 h-3.5" />
+                            Status Moderasi Akun
+                          </span>
+                          {selectedPlayer.isBanned ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
+                              🚫 TERBLOKIR / SUSPEND
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/20">
+                              ● Akun Normal
+                            </span>
+                          )}
+                        </div>
+
+                        {selectedPlayer.isBanned ? (
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-rose-300">
+                              Alasan Suspend: <em>&ldquo;{selectedPlayer.banReason || 'Pelanggaran aturan fair play'}&rdquo;</em>
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleBan(false)}
+                              disabled={modActionLoading}
+                              className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer transition-all disabled:opacity-50"
+                            >
+                              {modActionLoading ? 'Memproses...' : '✅ Cabut Status Suspend (Unban Akun)'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-slate-400 leading-tight">
+                              Blokir akses login dan penyimpanan akun ini jika dicurigai cheat atau eksploitasi sistem.
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={banReasonInput}
+                                onChange={(e) => setBanReasonInput(e.target.value)}
+                                placeholder="Alasan suspend akun (opsional)..."
+                                className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 outline-none focus:border-rose-400"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleToggleBan(true)}
+                                disabled={modActionLoading}
+                                className="px-3.5 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                              >
+                                {modActionLoading ? 'Memproses...' : '🚫 Suspend Akun'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TOOL 3: Player Moderation: Inject Compensation */}
+                    {activeModTool === 'compensation' && (
+                      <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2.5 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                            <Gift className="w-3.5 h-3.5" />
+                            Suntik Kas &amp; Tokens (Kompensasi Support)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-tight">
+                          Tambahkan saldo kas atau Whale Tokens ke akun pemain untuk keperluan ganti rugi bug atau reward khusus.
+                        </p>
+
+                        <form onSubmit={handleInjectCompensation} className="flex flex-col gap-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Kas ($):</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={compCash}
+                                onChange={(e) => setCompCash(e.target.value)}
+                                placeholder="Contoh: 500"
+                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-[#00FF88] placeholder:text-slate-600 outline-none focus:border-sky-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Tokens:</label>
+                              <input
+                                type="number"
+                                value={compTokens}
+                                onChange={(e) => setCompTokens(e.target.value)}
+                                placeholder="Contoh: 2"
+                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-400 placeholder:text-slate-600 outline-none focus:border-sky-400"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={compReason}
+                              onChange={(e) => setCompReason(e.target.value)}
+                              placeholder="Alasan / Catatan kompensasi..."
+                              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 outline-none focus:border-sky-400"
+                            />
+                            <button
+                              type="submit"
+                              disabled={modActionLoading || (!compCash && !compTokens)}
+                              className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
+                            >
+                              {modActionLoading ? 'Menyuntikkan...' : '🎁 Suntik Kompensasi'}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* TOOL 4: Reset Progres Save */}
+                    {activeModTool === 'reset' && (
+                      <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                            Reset Progres Pemain
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            Bahaya
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-tight">
+                          Kembalikan saldo kas akun ini ke $100, reset net worth, dan bersihkan seluruh item atau posisi korup.
+                        </p>
+                        <div className="pt-1 flex justify-end">
                           <button
                             type="button"
-                            onClick={() => handleToggleBan(true)}
+                            onClick={handleResetSave}
                             disabled={modActionLoading}
-                            className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-mono font-bold text-xs cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                            className="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 border border-rose-500/30 text-xs font-bold cursor-pointer transition-all disabled:opacity-50"
                           >
-                            {modActionLoading ? 'Memproses...' : '🚫 Suspend Akun'}
+                            {modActionLoading ? 'Mereset...' : '⚠️ Konfirmasi Reset ke Awal'}
                           </button>
                         </div>
                       </div>
                     )}
-                  </div>
 
-                  {/* Player Moderation: Inject Compensation */}
-                  <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-sky-400 flex items-center gap-1.5">
-                        <Gift className="w-3.5 h-3.5" />
-                        Suntik Kas &amp; Tokens (Kompensasi Support)
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-tight">
-                      Tambahkan saldo kas atau Whale Tokens ke akun pemain untuk keperluan ganti rugi bug atau reward khusus.
-                    </p>
-
-                    <form onSubmit={handleInjectCompensation} className="flex flex-col gap-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Kas ($):</label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={compCash}
-                            onChange={(e) => setCompCash(e.target.value)}
-                            placeholder="Contoh: 500"
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-[#00FF88] placeholder:text-slate-600 outline-none focus:border-sky-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5">Tambah Tokens:</label>
-                          <input
-                            type="number"
-                            value={compTokens}
-                            onChange={(e) => setCompTokens(e.target.value)}
-                            placeholder="Contoh: 2"
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-amber-400 placeholder:text-slate-600 outline-none focus:border-sky-400"
-                          />
-                        </div>
+                    {/* Feedback Messages */}
+                    {modActionMsg && (
+                      <div className={`p-2.5 rounded-xl text-xs ${modActionMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                        {modActionMsg.text}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={compReason}
-                          onChange={(e) => setCompReason(e.target.value)}
-                          placeholder="Alasan / Catatan kompensasi..."
-                          className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 outline-none focus:border-sky-400"
-                        />
-                        <button
-                          type="submit"
-                          disabled={modActionLoading || (!compCash && !compTokens)}
-                          className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-mono font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
-                        >
-                          {modActionLoading ? 'Menyuntikkan...' : '🎁 Suntik Kompensasi'}
-                        </button>
-                      </div>
-                    </form>
+                    )}
                   </div>
 
-                  {/* Reset Progres Save */}
-                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
-                        <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                        Reset Progres Pemain
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">Kembalikan kas ke $100 dan hapus seluruh item.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleResetSave}
-                      disabled={modActionLoading}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 font-mono text-xs cursor-pointer transition-all disabled:opacity-50"
-                    >
-                      Reset ke Awal
-                    </button>
-                  </div>
-
-                  {modActionMsg && (
-                    <div className={`p-2.5 rounded-xl text-xs font-mono ${modActionMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
-                      {modActionMsg.text}
-                    </div>
-                  )}
-
-                  <div className="pt-2 flex justify-end">
+                  {/* Sticky Footer */}
+                  <div className="border-t border-slate-800 px-5 sm:px-6 py-3 flex items-center justify-between shrink-0 bg-[#0B0F19]">
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {activeModTool ? `Tool: ${activeModTool}` : 'Belum ada aksi dipilih'}
+                    </span>
                     <button
                       onClick={() => {
                         setSelectedPlayer(null);
+                        setActiveModTool('');
                         setAdminResetMsg(null);
                         setAdminNewPassword('');
                         setModActionMsg(null);
                         setBanReasonInput('');
                         setCompCash('');
                         setCompTokens('');
+                        setCompReason('');
                       }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-bold cursor-pointer"
+                      className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
                     >
                       Tutup
                     </button>
                   </div>
+
                 </div>
               </div>
             )}
