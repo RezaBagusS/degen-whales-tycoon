@@ -42,7 +42,22 @@ test.describe('Ads Isolation Verification', () => {
   test('Monetag OnClick suppresses script if within 4-hour interval', async ({ page }) => {
     // Seed localStorage with a timestamp from 1 hour ago (< 4 hours cooldown)
     await page.addInitScript(() => {
-      localStorage.setItem('degen_monetag_onclick_last_ts', String(Date.now() - 3600000));
+      localStorage.setItem('degen_monetag_last_shown_ts', String(Date.now() - 3600000));
+    });
+    await page.goto('/');
+    await expect(page.locator('#monetag-onclick-script')).toHaveCount(0);
+  });
+
+  test('Monetag Vignette is NOT loaded when OnClick is active to prevent pair click spam', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#monetag-vignette-script')).toHaveCount(0);
+    const scripts = await page.$$eval('script', (elements) => elements.map((el) => el.src));
+    expect(scripts.some((src) => src.includes('vignette.min.js'))).toBe(false);
+  });
+
+  test('Monetag OnClick suppresses script if already fired in active session', async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('degen_monetag_session_fired', '1');
     });
     await page.goto('/');
     await expect(page.locator('#monetag-onclick-script')).toHaveCount(0);

@@ -17,6 +17,11 @@ export default function MonetagVignette() {
       return;
     }
 
+    // Jangan pernah muat Vignette jika dinonaktifkan atau jika OnClick aktif (mencegah bentrok / spam)
+    if (!ADS_CONFIG.monetag?.enableVignette || ADS_CONFIG.monetag?.onClickZoneId) {
+      return;
+    }
+
     const currentPath = window.location.pathname;
 
     // Strict safety check: Hanya boleh muncul jika tepat di halaman game root '/'
@@ -24,6 +29,17 @@ export default function MonetagVignette() {
     if (!isGamePage) {
       return;
     }
+
+    // 4-Hour Cooldown Protection
+    const STORAGE_KEY = 'degen_monetag_last_shown_ts';
+    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 4;
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    try {
+      const lastShown = localStorage.getItem(STORAGE_KEY);
+      if (lastShown && Date.now() - Number(lastShown) < intervalMs) {
+        return;
+      }
+    } catch {}
 
     const SCRIPT_ID = 'monetag-vignette-script';
     if (document.getElementById(SCRIPT_ID)) {

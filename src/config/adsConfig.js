@@ -36,7 +36,8 @@ export const ADS_CONFIG = {
     scriptUrl: 'https://n6wxm.com/vignette.min.js',
     onClickZoneId: '12121486',
     onClickScriptUrl: 'https://al5sm.com/tag.min.js',
-    onClickIntervalHours: 4 // Frekuensi iklan OnClick per pemain (setiap 4 jam)
+    onClickIntervalHours: 4, // Frekuensi iklan per pemain (setiap 4 jam)
+    enableVignette: false // Nonaktifkan Vignette agar tidak bentrok dengan OnClick (mencegah spam saat klik pair)
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)
