@@ -13,6 +13,8 @@ import {
   Search,
   ExternalLink,
   Lock,
+  Eye,
+  EyeOff,
   LogOut,
   Clock,
   Database,
@@ -61,6 +63,7 @@ export default function AdminDashboard() {
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminResetLoading, setAdminResetLoading] = useState(false);
   const [adminResetMsg, setAdminResetMsg] = useState(null);
+  const [showAdminPass, setShowAdminPass] = useState(false);
   const [, startTransition] = useTransition();
 
   // Load saved admin key from sessionStorage on mount
@@ -755,13 +758,22 @@ export default function AdminDashboard() {
                     )}
 
                     <form onSubmit={handleAdminResetPassword} className="flex items-center gap-2 pt-1">
-                      <input
-                        type="password"
-                        placeholder="Ketik password baru (min. 6 karakter)"
-                        value={adminNewPassword}
-                        onChange={(e) => setAdminNewPassword(e.target.value)}
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                      />
+                      <div className="relative flex-1">
+                        <input
+                          type={showAdminPass ? 'text' : 'password'}
+                          placeholder="Ketik password baru (min. 6 karakter)"
+                          value={adminNewPassword}
+                          onChange={(e) => setAdminNewPassword(e.target.value)}
+                          className="w-full pl-3 pr-8 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPass(!showAdminPass)}
+                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                        >
+                          {showAdminPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                       <button
                         type="submit"
                         disabled={adminResetLoading || !adminNewPassword}

@@ -54,6 +54,7 @@ import {
   Coins,
   MousePointer,
   Eye,
+  EyeOff,
   Clock,
   Gift,
   Server,
@@ -1394,6 +1395,9 @@ function TradingGame() {
   const [changePassConfirm, setChangePassConfirm] = useState('');
   const [changePassLoading, setChangePassLoading] = useState(false);
   const [changePassMsg, setChangePassMsg] = useState(null);
+  const [showOldPass, setShowOldPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   const [showUpdateEmail, setShowUpdateEmail] = useState(false);
   const [emailInput, setEmailInput] = useState('');
@@ -7886,27 +7890,59 @@ function TradingGame() {
                           </div>
                         )}
 
-                        <input
-                          type="password"
-                          placeholder="Password Lama"
-                          value={changePassOld}
-                          onChange={(e) => setChangePassOld(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                        />
-                        <input
-                          type="password"
-                          placeholder="Password Baru (min. 6 karakter)"
-                          value={changePassNew}
-                          onChange={(e) => setChangePassNew(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                        />
-                        <input
-                          type="password"
-                          placeholder="Konfirmasi Password Baru"
-                          value={changePassConfirm}
-                          onChange={(e) => setChangePassConfirm(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                        />
+                        {/* Password Lama */}
+                        <div className="relative">
+                          <input
+                            type={showOldPass ? 'text' : 'password'}
+                            placeholder="Password Lama"
+                            value={changePassOld}
+                            onChange={(e) => setChangePassOld(e.target.value)}
+                            className="w-full pl-2.5 pr-8 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOldPass(!showOldPass)}
+                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                          >
+                            {showOldPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Password Baru */}
+                        <div className="relative">
+                          <input
+                            type={showNewPass ? 'text' : 'password'}
+                            placeholder="Password Baru (min. 6 karakter)"
+                            value={changePassNew}
+                            onChange={(e) => setChangePassNew(e.target.value)}
+                            className="w-full pl-2.5 pr-8 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPass(!showNewPass)}
+                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                          >
+                            {showNewPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Konfirmasi Password Baru */}
+                        <div className="relative">
+                          <input
+                            type={showConfirmPass ? 'text' : 'password'}
+                            placeholder="Konfirmasi Password Baru"
+                            value={changePassConfirm}
+                            onChange={(e) => setChangePassConfirm(e.target.value)}
+                            className="w-full pl-2.5 pr-8 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPass(!showConfirmPass)}
+                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                          >
+                            {showConfirmPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
 
                         <button
                           type="submit"
