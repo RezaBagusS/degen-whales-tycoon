@@ -87,9 +87,11 @@ export async function GET(request) {
       }
 
       // Collect trades for global trade feed
-      history.slice(-5).forEach(trade => {
+      history.slice(-10).forEach(trade => {
         recentTrades.push({
           ...trade,
+          timestamp: trade.timestamp || (typeof trade.id === 'number' && trade.id > 1700000000000 ? trade.id : save.lastSavedAt),
+          pairSymbol: trade.pairSymbol || trade.pair || 'DEGEN/USDT',
           username: u.username,
           userId: u.id
         });

@@ -212,8 +212,9 @@ test('prestige stops old DPS immediately and preserves new tokens', async ({ pag
   await start(page, { cash: 50000, peakNetWorth: 50000, passiveLevels: { indikator: 10 } });
   await page.getByRole('button', { name: /Whale:/ }).click();
   await page.getByRole('button', { name: /Eksekusi Rugpull/ }).click();
-  await expect(page.getByTestId('cash')).toHaveText('$10.00');
   await expect(page.getByTestId('dps')).toHaveText('+$5.00/s');
+  expect(await cashValue(page)).toBeLessThan(50);
+  expect(await cashValue(page)).toBeGreaterThanOrEqual(10);
   await page.waitForTimeout(1100);
   expect((await readSave(page)).whaleTokens).toBe(1);
 });

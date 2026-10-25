@@ -480,14 +480,17 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Recent Trades Live Stream */}
+            {/* Recent Trades Live Stream (Closed Trades / Realized PnL) */}
             <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <TrendingUp className="w-4 h-4 text-sky-400" />
-                  <span className="font-mono font-bold text-sm text-white">Live Global Trade Stream</span>
+                  <span className="font-mono font-bold text-sm text-white">Riwayat Transaksi Selesai (Closed Trade Feed)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
+                    Realized PnL • Posisi Sudah Ditutup
+                  </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">50 Transaksi Terbaru</span>
+                <span className="text-[10px] font-mono text-slate-500">Transaksian Pemain Terbaru</span>
               </div>
 
               {(!data?.recentTrades || data.recentTrades.length === 0) ? (
@@ -510,10 +513,11 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-slate-800/60">
                       {data.recentTrades.slice(0, 15).map((t, idx) => {
                         const isWin = (t.pnl || 0) >= 0;
+                        const hasPrices = t.entryPrice && t.exitPrice && (t.entryPrice > 0 || t.exitPrice > 0);
                         return (
                           <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
                             <td className="py-2 px-3 text-slate-500 text-[11px]">
-                              {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : '-'}
+                              {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Tersimpan'}
                             </td>
                             <td className="py-2 px-3 font-semibold text-white">
                               {t.username}
@@ -529,10 +533,15 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="py-2 px-3 text-slate-400 text-[11px]">
-                              {formatMoney(t.entryPrice)} → {formatMoney(t.exitPrice)}
+                              {hasPrices ? (
+                                `${formatMoney(t.entryPrice)} → ${formatMoney(t.exitPrice)}`
+                              ) : (
+                                <span className="text-slate-500 italic">Selesai (Closed)</span>
+                              )}
                             </td>
                             <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
-                              {isWin ? '+' : ''}{formatMoney(t.pnl)} ({isWin ? '+' : ''}{(t.roi || 0).toFixed(1)}%)
+                              <div>{isWin ? '+' : ''}{formatMoney(t.pnl)} ({isWin ? '+' : ''}{(t.roi || 0).toFixed(1)}%)</div>
+                              <div className="text-[9px] font-normal text-slate-500 uppercase">{t.status || (isWin ? 'PROFIT' : 'LOSS')}</div>
                             </td>
                           </tr>
                         );

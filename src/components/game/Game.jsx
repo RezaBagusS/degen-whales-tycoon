@@ -4241,9 +4241,13 @@ function TradingGame() {
       setTradeHistory((prev) => [
         {
           id: Date.now(),
+          timestamp: Date.now(),
           pair: pos.pairSymbol,
+          pairSymbol: pos.pairSymbol,
           type: pos.type,
           leverage: pos.leverage,
+          entryPrice: pos.entryPrice,
+          exitPrice: stats ? stats.posPrice : currentPrice,
           pnl: netPnl,
           roi: roiPercent,
           status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
@@ -4308,9 +4312,13 @@ function TradingGame() {
       }
       newHistoryEntries.push({
         id: now + idx,
+        timestamp: now,
         pair: pos.pairSymbol,
+        pairSymbol: pos.pairSymbol,
         type: pos.type,
         leverage: pos.leverage,
+        entryPrice: pos.entryPrice,
+        exitPrice: stats ? stats.posPrice : currentPrice,
         pnl: netPnl,
         roi: roiPercent,
         status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
@@ -4368,9 +4376,13 @@ function TradingGame() {
       setTradeHistory((prev) => [
         {
           id: Date.now(),
+          timestamp: Date.now(),
           pair: pos.pairSymbol,
+          pairSymbol: pos.pairSymbol,
           type: pos.type,
           leverage: pos.leverage,
+          entryPrice: pos.entryPrice,
+          exitPrice: pos.liqPrice || pos.entryPrice,
           pnl: -lost,
           roi: -15,
           status: 'DEFENDED'
@@ -4399,9 +4411,13 @@ function TradingGame() {
     setTradeHistory((prev) => [
       {
         id: Date.now(),
+        timestamp: Date.now(),
         pair: pos.pairSymbol,
+        pairSymbol: pos.pairSymbol,
         type: pos.type,
         leverage: pos.leverage,
+        entryPrice: pos.entryPrice,
+        exitPrice: pos.liqPrice || pos.entryPrice,
         pnl: -lost,
         roi: -100,
         status: 'LIQUIDATED'
