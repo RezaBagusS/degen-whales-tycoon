@@ -1377,7 +1377,8 @@ function TradingGame() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showWorkstationGallery, setShowWorkstationGallery] = useState(false);
   const [showRewardedAdModal, setShowRewardedAdModal] = useState(false);
-  const [adRewardType, setAdRewardType] = useState('cash_reward'); // 'liquidation_bailout' | 'cash_reward'
+  const [adRewardType, setAdRewardType] = useState('cash_reward'); // 'liquidation_bailout' | 'cash_reward' | 'offline_doubler'
+  const pendingOfflineDoublerRef = useRef(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeTab, setActiveTab] = useState('quests');
@@ -7894,8 +7895,36 @@ function TradingGame() {
               <button
                 type="button"
                 onClick={() => {
-                  setAdRewardType('offline_doubler');
-                  setShowRewardedAdModal(true);
+                  const extraEarned = offlineModal.earned;
+                  const offlineSecs = offlineModal.seconds;
+                  pendingOfflineDoublerRef.current = { earned: extraEarned, seconds: offlineSecs };
+                  setOfflineModal(null);
+
+                  if (ADS_CONFIG.mode === 'monetag' && ADS_CONFIG.monetag?.directLinkUrl) {
+                    try {
+                      window.open(ADS_CONFIG.monetag.directLinkUrl, '_blank', 'noopener,noreferrer');
+                    } catch {}
+                    setCash((prev) => prev + extraEarned);
+                    addCashLog({
+                      type: 'OFFLINE_PASSIVE',
+                      category: 'income',
+                      title: 'Hasil Cuan Bot & Kru Offline',
+                      amount: extraEarned,
+                      detail: `${offlineSecs}s offline`
+                    });
+                    addCashLog({
+                      type: 'OFFLINE_2X',
+                      category: 'income',
+                      title: '⚡ Gandakan Cuan Offline 2x (Sponsor)',
+                      amount: extraEarned,
+                      detail: 'Bonus 2x lipat pendapatan offline'
+                    });
+                    playProfitSound();
+                    triggerToast(`🎉 Cuan Pasif Offline Berhasil Digandakan 2x! +${formatMoney(extraEarned)} bonus masuk kas!`, 'success');
+                  } else {
+                    setAdRewardType('offline_doubler');
+                    setShowRewardedAdModal(true);
+                  }
                 }}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
               >
@@ -8392,7 +8421,7 @@ function TradingGame() {
           adRewardType === 'cash_reward'
             ? '$5.00 Cash'
             : adRewardType === 'offline_doubler'
-              ? `+${formatMoney(offlineModal?.earned || 5)} Cash`
+              ? `+${formatMoney(pendingOfflineDoublerRef.current?.earned || offlineModal?.earned || 5)} Cash`
               : formatMoney(Math.max(5, (liquidationAlert?.lostAmount || 0) * 0.2))
         }
         onRewardComplete={() => {
@@ -8411,14 +8440,15 @@ function TradingGame() {
             return;
           }
           if (adRewardType === 'offline_doubler') {
-            const extraEarned = offlineModal?.earned || 5;
+            const extraEarned = pendingOfflineDoublerRef.current?.earned || offlineModal?.earned || 5;
+            const offlineSecs = pendingOfflineDoublerRef.current?.seconds || offlineModal?.seconds || 0;
             setCash((prev) => prev + extraEarned);
             addCashLog({
               type: 'OFFLINE_PASSIVE',
               category: 'income',
               title: 'Hasil Cuan Bot & Kru Offline',
               amount: extraEarned,
-              detail: `${offlineModal?.seconds || 0}s offline`
+              detail: `${offlineSecs}s offline`
             });
             addCashLog({
               type: 'OFFLINE_2X',
