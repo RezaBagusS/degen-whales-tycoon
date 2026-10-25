@@ -20,8 +20,24 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     const json = await res.json();
     expect(json.success).toBe(true);
     expect(json.overview).toBeDefined();
-    expect(json.apm).toBeDefined();
-    expect(Array.isArray(json.players)).toBe(true);
+    expect(json.overview.activeUsersNow).toBeDefined();
+    expect(typeof json.overview.activeUsersNow).toBe('number');
+    expect(json.playersPagination).toBeDefined();
+    expect(json.tradesPagination).toBeDefined();
+    expect(json.positionsPagination).toBeDefined();
+  });
+
+  test('supports pagination parameters in /api/admin/metrics', async ({ request }) => {
+    const res = await request.get('/api/admin/metrics?playersPage=1&playersLimit=2&playerStatus=all', {
+      headers: {
+        'x-admin-key': adminKey
+      }
+    });
+    expect(res.status()).toBe(200);
+    const json = await res.json();
+    expect(json.players.length).toBeLessThanOrEqual(2);
+    expect(json.playersPagination.page).toBe(1);
+    expect(json.playersPagination.limit).toBe(2);
   });
 
   test('records client telemetry errors via /api/telemetry/report', async ({ request }) => {
@@ -49,13 +65,15 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     // Verify main ops center renders
     await expect(page.getByText('OPS CENTER')).toBeVisible();
     await expect(page.getByText('Overview & Telemetri')).toBeVisible();
+    await expect(page.getByText('Online Sekarang')).toBeVisible();
     await expect(page.getByText('Whale Watcher')).toBeVisible();
     await expect(page.getByText('Risk & Degen Monitor')).toBeVisible();
     await expect(page.getByText('APM & Sentry Logs')).toBeVisible();
 
-    // Check tabs switching
+    // Check tabs switching and pagination presence
     await page.getByRole('button', { name: /Whale Watcher/i }).click();
     await expect(page.getByText('Whale Watcher & Player CRM')).toBeVisible();
+    await expect(page.getByPlaceholder('Cari username / email...')).toBeVisible();
 
     await page.getByRole('button', { name: /Risk & Degen Monitor/i }).click();
     await expect(page.getByText(/Live Position Risk & Leverage Monitor/i)).toBeVisible();

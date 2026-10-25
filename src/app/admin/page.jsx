@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Server,
   Layers,
-  Sparkles
+  Sparkles,
+  ChevronLeft
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -45,8 +46,95 @@ const formatMoney = (val) => {
   if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
   if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
   if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
-  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${num.toFixed(2)}`;
 };
+
+/**
+ * Reusable Cyberpunk Pagination Controls
+ */
+function PaginationControl({
+  page = 1,
+  totalPages = 1,
+  total = 0,
+  limit = 10,
+  onPageChange,
+  onLimitChange,
+  label = 'data'
+}) {
+  if (total === 0) return null;
+  const startIdx = Math.min((page - 1) * limit + 1, total);
+  const endIdx = Math.min(page * limit, total);
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800/80 font-mono text-xs text-slate-400">
+      <div className="flex items-center gap-2">
+        <span>
+          Menampilkan <strong className="text-white">{startIdx}-{endIdx}</strong> dari <strong className="text-white">{total}</strong> {label}
+        </span>
+        {onLimitChange && (
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="text-[11px] text-slate-500">Baris:</span>
+            <select
+              value={limit}
+              onChange={(e) => onLimitChange(Number(e.target.value))}
+              aria-label="Jumlah baris per halaman"
+              className="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-xs text-slate-300 outline-none cursor-pointer focus:border-slate-700"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onPageChange(1)}
+          disabled={page <= 1}
+          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs"
+          title="Halaman Pertama"
+        >
+          «
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1"
+        >
+          <ChevronLeft className="w-3 h-3" />
+          <span>Prev</span>
+        </button>
+        
+        <span className="px-3 py-1 rounded bg-slate-950 border border-slate-800 text-emerald-400 font-bold text-xs">
+          {page} / {Math.max(1, totalPages)}
+        </span>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs flex items-center gap-1"
+        >
+          <span>Next</span>
+          <ChevronRight className="w-3 h-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(totalPages)}
+          disabled={page >= totalPages}
+          className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 cursor-pointer text-xs"
+          title="Halaman Terakhir"
+        >
+          »
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState('');
@@ -58,7 +146,23 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Pagination & Filtering States
   const [searchPlayer, setSearchPlayer] = useState('');
+  const [playerStatusFilter, setPlayerStatusFilter] = useState('all'); // 'all' | 'online' | 'active24h'
+  const [playersPage, setPlayersPage] = useState(1);
+  const [playersLimit, setPlayersLimit] = useState(10);
+
+  const [tradesPage, setTradesPage] = useState(1);
+  const [tradesLimit, setTradesLimit] = useState(10);
+
+  const [positionsPage, setPositionsPage] = useState(1);
+  const [positionsLimit, setPositionsLimit] = useState(10);
+
+  const [apmPage, setApmPage] = useState(1);
+  const [apmLimit, setApmLimit] = useState(10);
+
+  // Modal Detail & Password Reset State
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminResetLoading, setAdminResetLoading] = useState(false);
@@ -77,12 +181,40 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Fetch metrics function
-  const fetchMetrics = useCallback(async (keyToUse = adminKey) => {
+  // Fetch metrics function with API query parameters
+  const fetchMetrics = useCallback(async (
+    keyToUse = adminKey,
+    params = {}
+  ) => {
     if (!keyToUse) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/metrics?key=${encodeURIComponent(keyToUse)}`);
+      const q = new URLSearchParams();
+      q.set('key', keyToUse);
+
+      const pPage = params.playersPage ?? playersPage;
+      const pLimit = params.playersLimit ?? playersLimit;
+      const pStatus = params.playerStatus ?? playerStatusFilter;
+      const pSearch = params.searchPlayer !== undefined ? params.searchPlayer : searchPlayer;
+
+      const tPage = params.tradesPage ?? tradesPage;
+      const tLimit = params.tradesLimit ?? tradesLimit;
+
+      const posPage = params.positionsPage ?? positionsPage;
+      const posLimit = params.positionsLimit ?? positionsLimit;
+
+      q.set('playersPage', String(pPage));
+      q.set('playersLimit', String(pLimit));
+      q.set('playerStatus', String(pStatus));
+      if (pSearch) q.set('searchPlayer', pSearch);
+
+      q.set('tradesPage', String(tPage));
+      q.set('tradesLimit', String(tLimit));
+
+      q.set('positionsPage', String(posPage));
+      q.set('positionsLimit', String(posLimit));
+
+      const res = await fetch(`/api/admin/metrics?${q.toString()}`);
       if (res.status === 401) {
         setIsAuthenticated(false);
         setAuthError('Kunci Admin tidak valid! Periksa kembali ADMIN_SECRET_KEY Anda.');
@@ -101,12 +233,12 @@ export default function AdminDashboard() {
       } else {
         setAuthError(json.error || 'Gagal memuat data telemetri');
       }
-    } catch (err) {
+    } catch {
       setAuthError('Gagal terhubung ke server');
     } finally {
       setLoading(false);
     }
-  }, [adminKey]);
+  }, [adminKey, playersPage, playersLimit, playerStatusFilter, searchPlayer, tradesPage, tradesLimit, positionsPage, positionsLimit]);
 
   // Initial fetch on authenticated
   useEffect(() => {
@@ -207,7 +339,7 @@ export default function AdminDashboard() {
                 autoFocus
               />
               <span className="text-[10px] text-slate-500 font-mono mt-1 block">
-                Default dev key: <code className="text-emerald-400/80">degen_admin_2026</code>
+                Default dev key: <code className="text-emerald-400/80">dw_admin_9x7f2026_whale</code>
               </span>
             </div>
 
@@ -240,23 +372,23 @@ export default function AdminDashboard() {
     );
   }
 
-  // Filtered players
-  const filteredPlayers = (data?.players || []).filter(p =>
-    p.username.toLowerCase().includes(searchPlayer.toLowerCase()) ||
-    (p.syndicateTag && p.syndicateTag.toLowerCase().includes(searchPlayer.toLowerCase()))
-  );
+  // APM Errors pagination
+  const allApmErrors = data?.apm?.errorsRecent || [];
+  const totalApmErrors = allApmErrors.length;
+  const totalApmPages = Math.max(1, Math.ceil(totalApmErrors / apmLimit));
+  const paginatedApmErrors = allApmErrors.slice((apmPage - 1) * apmLimit, apmPage * apmLimit);
 
   return (
     <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      {/* Top Header Bar */}
+      <header className="border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center">
-            <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md shadow-emerald-500/10">
+            <Radio className="w-5 h-5 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-black text-sm sm:text-base text-white tracking-wide">
+              <span className="font-mono font-bold text-sm tracking-wide text-white">
                 DEGEN &amp; WHALE <span className="text-emerald-400">OPS CENTER</span>
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
@@ -350,7 +482,7 @@ export default function AdminDashboard() {
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Whale Watcher ({data?.players?.length || 0})</span>
+            <span>Whale Watcher ({data?.overview?.totalUsers || 0})</span>
           </button>
 
           <button
@@ -362,7 +494,7 @@ export default function AdminDashboard() {
             }`}
           >
             <Flame className="w-4 h-4" />
-            <span>Risk &amp; Degen Monitor ({data?.activePositions?.length || 0})</span>
+            <span>Risk & Degen Monitor ({data?.overview?.openPositionsCount || 0})</span>
           </button>
 
           <button
@@ -381,8 +513,10 @@ export default function AdminDashboard() {
         {/* TAB 1: OVERVIEW & TELEMETRI */}
         {activeTab === 'overview' && (
           <div className="flex flex-col gap-5">
-            {/* 6 Top Metric Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            {/* Top Metric Cards (Includes Real-time Online Users Now) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
+              
+              {/* Card 1: Total Users */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-[11px] font-mono font-semibold uppercase">Total Pemain</span>
@@ -394,6 +528,22 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-mono text-slate-500 mt-1">Terdaftar di DB</div>
               </div>
 
+              {/* Card 2: Online Users Now (Real-time < 5m) */}
+              <div className="bg-[#0B0F19] p-4 rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/5 to-transparent flex flex-col justify-between relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-[11px] font-mono font-bold uppercase text-emerald-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Online Sekarang
+                  </span>
+                  <Radio className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-xl sm:text-2xl font-mono font-black text-[#00FF88]">
+                  {data?.overview?.activeUsersNow ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-emerald-400/80 mt-1">Aktif 5 Menit Terakhir</div>
+              </div>
+
+              {/* Card 3: DAU (24 Jam) */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-[11px] font-mono font-semibold uppercase">DAU (24 Jam)</span>
@@ -402,9 +552,10 @@ export default function AdminDashboard() {
                 <div className="text-xl sm:text-2xl font-mono font-black text-sky-400">
                   {data?.overview?.activeUsers24h ?? '...'}
                 </div>
-                <div className="text-[10px] font-mono text-slate-500 mt-1">Pemain Aktif Hari Ini</div>
+                <div className="text-[10px] font-mono text-slate-500 mt-1">Aktif Hari Ini</div>
               </div>
 
+              {/* Card 4: Circulating Cash */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-[11px] font-mono font-semibold uppercase">Circulating Cash</span>
@@ -416,6 +567,7 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-mono text-slate-500 mt-1">Total Saldo Tunai</div>
               </div>
 
+              {/* Card 5: Whale Tokens */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-[11px] font-mono font-semibold uppercase">Whale Tokens</span>
@@ -427,6 +579,7 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-mono text-slate-500 mt-1">Total Token Beredar</div>
               </div>
 
+              {/* Card 6: Open Positions */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
                   <span className="text-[11px] font-mono font-semibold uppercase">Posisi Terbuka</span>
@@ -438,9 +591,10 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-mono text-slate-500 mt-1">Posisi Trading Aktif</div>
               </div>
 
+              {/* Card 7: DB Ping Latency */}
               <div className="bg-[#0B0F19] p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-400 mb-2">
-                  <span className="text-[11px] font-mono font-semibold uppercase">DB Ping Latency</span>
+                  <span className="text-[11px] font-mono font-semibold uppercase">DB Latency</span>
                   <Database className="w-4 h-4 text-sky-400" />
                 </div>
                 <div className="text-xl sm:text-2xl font-mono font-black text-white">
@@ -450,90 +604,19 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Server Vitals & APM Banner */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Server className="w-4 h-4 text-emerald-400" />
-                    <span className="font-mono font-bold text-sm text-white">System Runtime &amp; Server Health</span>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Next.js 16 App Router
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                    <span className="text-[10px] font-mono text-slate-400 block mb-1">Heap Used</span>
-                    <span className="text-base font-mono font-bold text-white">{data?.apm?.memory?.heapUsedMb || 0} MB</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                    <span className="text-[10px] font-mono text-slate-400 block mb-1">Process RSS</span>
-                    <span className="text-base font-mono font-bold text-white">{data?.apm?.memory?.rssMb || 0} MB</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                    <span className="text-[10px] font-mono text-slate-400 block mb-1">API Avg Latency</span>
-                    <span className="text-base font-mono font-bold text-sky-400">{data?.apm?.latency?.avgMs || 0} ms</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                    <span className="text-[10px] font-mono text-slate-400 block mb-1">Server Uptime</span>
-                    <span className="text-base font-mono font-bold text-emerald-400">
-                      {Math.floor((data?.apm?.uptimeSec || 0) / 60)} m {Math.floor((data?.apm?.uptimeSec || 0) % 60)} s
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sentry / Error Telemetry Status */}
-              <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col justify-between gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-sm text-white flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-purple-400" />
-                    Sentry APM Status
-                  </span>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
-                    data?.apm?.sentryConfigured
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  }`}>
-                    {data?.apm?.sentryConfigured ? '● Sentry Active' : '● Internal Telemetry'}
-                  </span>
-                </div>
-
-                <div className="text-xs font-mono text-slate-400 leading-relaxed">
-                  {data?.apm?.sentryConfigured ? (
-                    <span className="text-emerald-400">
-                      DSN Sentry aktif! Seluruh error runtime diteruskan otomatis ke proyek Sentry Anda.
-                    </span>
-                  ) : (
-                    <span>
-                      Error runtime ditangkap via in-memory ring buffer. Tambahkan <code>SENTRY_DSN</code> di <code>.env</code> untuk meneruskan ke Sentry cloud.
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setActiveTab('apm')}
-                  className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-mono text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>Lihat Error Logs ({data?.apm?.errorCountTotal || 0})</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Trades Live Stream (Closed Trades / Realized PnL) */}
-            <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
+            {/* Closed Trade Feed with Pagination */}
+            <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-sky-400" />
                   <span className="font-mono font-bold text-sm text-white">Riwayat Transaksi Selesai (Closed Trade Feed)</span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
                     Realized PnL • Posisi Sudah Ditutup
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">Transaksian Pemain Terbaru</span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  Total Tercatat: {data?.tradesPagination?.total ?? 0} Transaksi
+                </span>
               </div>
 
               {(!data?.recentTrades || data.recentTrades.length === 0) ? (
@@ -554,7 +637,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
-                      {data.recentTrades.slice(0, 15).map((t, idx) => {
+                      {data.recentTrades.map((t, idx) => {
                         const isWin = (t.pnl || 0) >= 0;
                         const hasPrices = t.entryPrice && t.exitPrice && (t.entryPrice > 0 || t.exitPrice > 0);
                         return (
@@ -583,8 +666,7 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
-                              <div>{isWin ? '+' : ''}{formatMoney(t.pnl)} ({isWin ? '+' : ''}{(t.roi || 0).toFixed(1)}%)</div>
-                              <div className="text-[9px] font-normal text-slate-500 uppercase">{t.status || (isWin ? 'PROFIT' : 'LOSS')}</div>
+                              {isWin ? `+${formatMoney(t.pnl)}` : `-${formatMoney(Math.abs(t.pnl))}`}
                             </td>
                           </tr>
                         );
@@ -593,28 +675,112 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+
+              {/* Trades Pagination Control */}
+              {data?.tradesPagination && (
+                <PaginationControl
+                  page={data.tradesPagination.page}
+                  totalPages={data.tradesPagination.totalPages}
+                  total={data.tradesPagination.total}
+                  limit={tradesLimit}
+                  label="transaksi"
+                  onPageChange={(newPage) => {
+                    setTradesPage(newPage);
+                    fetchMetrics(adminKey, { tradesPage: newPage });
+                  }}
+                  onLimitChange={(newLimit) => {
+                    setTradesLimit(newLimit);
+                    setTradesPage(1);
+                    fetchMetrics(adminKey, { tradesLimit: newLimit, tradesPage: 1 });
+                  }}
+                />
+              )}
             </div>
           </div>
         )}
 
-        {/* TAB 2: WHALE WATCHER (PLAYER CRM) */}
+        {/* TAB 2: WHALE WATCHER (PLAYERS TABLE) */}
         {activeTab === 'players' && (
           <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h2 className="font-mono font-bold text-base text-white">Whale Watcher &amp; Player CRM</h2>
-                <p className="text-xs font-mono text-slate-400">Pantau seluruh pemain terdaftar, level kekayaan, dan inventaris</p>
+                <h3 className="font-mono font-bold text-sm text-white flex items-center gap-2">
+                  <span>Whale Watcher &amp; Player CRM</span>
+                </h3>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Total Ditemukan: {data?.playersPagination?.total ?? (data?.players?.length || 0)} Akun
+                </span>
               </div>
 
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchPlayer}
-                  onChange={(e) => setSearchPlayer(e.target.value)}
-                  placeholder="Cari username pemain..."
-                  className="pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-white outline-none focus:border-sky-500 w-full sm:w-64"
-                />
+              {/* Search & Filter Toolbar */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Status Filter Badges */}
+                <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerStatusFilter('all');
+                      setPlayersPage(1);
+                      fetchMetrics(adminKey, { playerStatus: 'all', playersPage: 1 });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+                      playerStatusFilter === 'all'
+                        ? 'bg-slate-800 text-white font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Semua
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerStatusFilter('online');
+                      setPlayersPage(1);
+                      fetchMetrics(adminKey, { playerStatus: 'online', playersPage: 1 });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                      playerStatusFilter === 'online'
+                        ? 'bg-emerald-500/20 text-[#00FF88] border border-emerald-500/30 font-bold'
+                        : 'text-slate-400 hover:text-emerald-400'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Online ({data?.overview?.activeUsersNow ?? 0})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerStatusFilter('active24h');
+                      setPlayersPage(1);
+                      fetchMetrics(adminKey, { playerStatus: 'active24h', playersPage: 1 });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+                      playerStatusFilter === 'active24h'
+                        ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold'
+                        : 'text-slate-400 hover:text-sky-400'
+                    }`}
+                  >
+                    Aktif 24 Jam ({data?.overview?.activeUsers24h ?? 0})
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchPlayer}
+                    onChange={(e) => {
+                      setSearchPlayer(e.target.value);
+                      setPlayersPage(1);
+                      fetchMetrics(adminKey, { searchPlayer: e.target.value, playersPage: 1 });
+                    }}
+                    placeholder="Cari username / email..."
+                    className="pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-white outline-none focus:border-sky-500 w-full sm:w-60"
+                  />
+                </div>
               </div>
             </div>
 
@@ -623,7 +789,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
                     <th className="py-2.5 px-3">Peringkat</th>
-                    <th className="py-2.5 px-3">Username</th>
+                    <th className="py-2.5 px-3">Username &amp; Status</th>
                     <th className="py-2.5 px-3">Workstation</th>
                     <th className="py-2.5 px-3 text-right">Saldo Kas</th>
                     <th className="py-2.5 px-3 text-right">Peak Net Worth</th>
@@ -633,52 +799,102 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {filteredPlayers.map((player, idx) => (
-                    <tr key={player.id} className="hover:bg-slate-900/50 transition-colors">
-                      <td className="py-3 px-3 text-slate-500 font-bold">#{idx + 1}</td>
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span>{player.username}</span>
-                          {player.syndicateTag && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                              [{player.syndicateTag}]
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          Aktif: {player.lastActive ? new Date(player.lastActive).toLocaleDateString() : '-'}
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="text-slate-300 font-semibold">
-                          {LOCATION_NAMES[player.currentLocationLevel] || `Tier ${player.currentLocationLevel}`}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-semibold text-emerald-400">
-                        {formatMoney(player.cash)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-white">
-                        {formatMoney(player.peakNetWorth)}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-amber-400">
-                        {player.whaleTokens}
-                      </td>
-                      <td className="py-3 px-3 text-center text-slate-400">
-                        {player.tradeCount}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() => setSelectedPlayer(player)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
-                        >
-                          Detail
-                        </button>
+                  {(!data?.players || data.players.length === 0) ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-500">
+                        Tidak ada pemain yang sesuai dengan filter.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    data.players.map((player, idx) => {
+                      const rank = (playersPage - 1) * playersLimit + idx + 1;
+                      return (
+                        <tr key={player.id} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="py-3 px-3 text-slate-500 font-bold">#{rank}</td>
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-white flex items-center gap-2">
+                              {player.isOnline ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[#00FF88] text-[10px] font-bold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Online
+                                </span>
+                              ) : player.isActive24h ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px]">
+                                  24h
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 text-[10px]">
+                                  Offline
+                                </span>
+                              )}
+                              <span>@{player.username}</span>
+                              {player.syndicateTag && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                  [{player.syndicateTag}]
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              Aktif: {player.lastActive ? new Date(player.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(player.lastActive).toLocaleDateString() : '-'}
+                              {player.email && <span className="ml-2 text-slate-600">({player.email})</span>}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="text-slate-300 font-semibold">
+                              {LOCATION_NAMES[player.currentLocationLevel] || `Tier ${player.currentLocationLevel}`}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-semibold text-emerald-400">
+                            {formatMoney(player.cash)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-white">
+                            {formatMoney(player.peakNetWorth)}
+                          </td>
+                          <td className="py-3 px-3 text-center font-bold text-amber-400">
+                            {player.whaleTokens}
+                          </td>
+                          <td className="py-3 px-3 text-center text-slate-400">
+                            {player.tradeCount}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedPlayer(player);
+                                setAdminResetMsg(null);
+                                setAdminNewPassword('');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
+                            >
+                              Detail
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Players Pagination Control */}
+            {data?.playersPagination && (
+              <PaginationControl
+                page={data.playersPagination.page}
+                totalPages={data.playersPagination.totalPages}
+                total={data.playersPagination.total}
+                limit={playersLimit}
+                label="pemain"
+                onPageChange={(newPage) => {
+                  setPlayersPage(newPage);
+                  fetchMetrics(adminKey, { playersPage: newPage });
+                }}
+                onLimitChange={(newLimit) => {
+                  setPlayersLimit(newLimit);
+                  setPlayersPage(1);
+                  fetchMetrics(adminKey, { playersLimit: newLimit, playersPage: 1 });
+                }}
+              />
+            )}
 
             {/* Modal Detail Pemain */}
             {selectedPlayer && (
@@ -687,7 +903,16 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div>
                       <h3 className="font-mono font-bold text-base text-white flex items-center gap-2">
-                        <span>Detail Pemain: {selectedPlayer.username}</span>
+                        <span>Detail Pemain: @{selectedPlayer.username}</span>
+                        {selectedPlayer.isOnline ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00FF88] border border-emerald-500/30">
+                            Online Sekarang
+                          </span>
+                        ) : selectedPlayer.isActive24h ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                            Aktif 24 Jam
+                          </span>
+                        ) : null}
                       </h3>
                       <span className="text-[11px] font-mono text-slate-400">ID: {selectedPlayer.id}</span>
                     </div>
@@ -802,20 +1027,19 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* TAB 3: RISK & DEGEN MONITOR */}
+        {/* TAB 3: RISK RADAR (POSITIONS TABLE) */}
         {activeTab === 'risk' && (
           <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h2 className="font-mono font-bold text-base text-white flex items-center gap-2">
+                <h3 className="font-mono font-bold text-sm text-white flex items-center gap-2">
                   <Flame className="w-4 h-4 text-amber-400" />
-                  Live Position Risk &amp; Leverage Monitor
-                </h2>
-                <p className="text-xs font-mono text-slate-400">Pantau seluruh posisi leverage tinggi pemain di seluruh market</p>
+                  <span>Live Position Risk &amp; Leverage Monitor</span>
+                </h3>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Total Notional &amp; Risiko Likuidasi Pemain ({data?.positionsPagination?.total ?? (data?.activePositions?.length || 0)} Posisi)
+                </span>
               </div>
-              <span className="text-xs font-mono px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-800">
-                Total Posisi: {data?.activePositions?.length || 0}
-              </span>
             </div>
 
             {(!data?.activePositions || data.activePositions.length === 0) ? (
@@ -843,7 +1067,7 @@ export default function AdminDashboard() {
                       return (
                         <tr key={pos.id} className="hover:bg-slate-900/50 transition-colors">
                           <td className="py-3 px-3 font-semibold text-white">
-                            {pos.username}
+                            @{pos.username}
                           </td>
                           <td className="py-3 px-3 text-sky-400 font-bold">
                             {pos.pairSymbol}
@@ -881,6 +1105,26 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+
+            {/* Positions Pagination Control */}
+            {data?.positionsPagination && (
+              <PaginationControl
+                page={data.positionsPagination.page}
+                totalPages={data.positionsPagination.totalPages}
+                total={data.positionsPagination.total}
+                limit={positionsLimit}
+                label="posisi"
+                onPageChange={(newPage) => {
+                  setPositionsPage(newPage);
+                  fetchMetrics(adminKey, { positionsPage: newPage });
+                }}
+                onLimitChange={(newLimit) => {
+                  setPositionsLimit(newLimit);
+                  setPositionsPage(1);
+                  fetchMetrics(adminKey, { positionsLimit: newLimit, positionsPage: 1 });
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -914,23 +1158,23 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Error Logs Table */}
+            {/* Error Logs Table with Pagination */}
             <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-mono font-bold text-sm text-white">Daftar Error Runtime Terbaru</h3>
-                  <span className="text-[11px] font-mono text-slate-400">Total Tercatat: {data?.apm?.errorCountTotal || 0} Error</span>
+                  <span className="text-[11px] font-mono text-slate-400">Total Tercatat: {totalApmErrors} Error</span>
                 </div>
               </div>
 
-              {(!data?.apm?.errorsRecent || data.apm.errorsRecent.length === 0) ? (
+              {totalApmErrors === 0 ? (
                 <div className="text-center py-12 text-slate-500 font-mono text-xs flex flex-col items-center gap-2">
                   <CheckCircle2 className="w-8 h-8 text-emerald-500/40" />
                   <span>Sistem Berjalan Mulus! Tidak ada error runtime yang tercatat.</span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2.5">
-                  {data.apm.errorsRecent.map((err) => (
+                  {paginatedApmErrors.map((err) => (
                     <div key={err.id} className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2 font-mono text-xs">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
@@ -962,6 +1206,20 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   ))}
+
+                  {/* APM Pagination Control */}
+                  <PaginationControl
+                    page={apmPage}
+                    totalPages={totalApmPages}
+                    total={totalApmErrors}
+                    limit={apmLimit}
+                    label="log error"
+                    onPageChange={(newPage) => setApmPage(newPage)}
+                    onLimitChange={(newLimit) => {
+                      setApmLimit(newLimit);
+                      setApmPage(1);
+                    }}
+                  />
                 </div>
               )}
             </div>

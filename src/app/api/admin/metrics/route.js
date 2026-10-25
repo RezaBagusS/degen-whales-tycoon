@@ -22,16 +22,38 @@ export async function GET(request) {
   }
 
   try {
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
+
+    // Pagination query params
+    const playersPage = Math.max(1, parseInt(searchParams.get('playersPage') || '1', 10));
+    const playersLimit = Math.max(1, Math.min(100, parseInt(searchParams.get('playersLimit') || '10', 10)));
+    const searchPlayer = (searchParams.get('searchPlayer') || '').trim().toLowerCase();
+    const playerStatus = searchParams.get('playerStatus') || 'all'; // 'all' | 'online' | 'active24h'
+
+    const tradesPage = Math.max(1, parseInt(searchParams.get('tradesPage') || '1', 10));
+    const tradesLimit = Math.max(1, Math.min(100, parseInt(searchParams.get('tradesLimit') || '10', 10)));
+
+    const positionsPage = Math.max(1, parseInt(searchParams.get('positionsPage') || '1', 10));
+    const positionsLimit = Math.max(1, Math.min(100, parseInt(searchParams.get('positionsLimit') || '10', 10)));
+
+    const now = Date.now();
+    const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
 
     // 1. Measure DB ping latency
     const dbStart = performance.now();
     await prisma.$queryRaw`SELECT 1`;
     const dbLatencyMs = Math.round(performance.now() - dbStart);
 
-    // 2. Overview Counts & Aggregates
-    const [totalUsers, activeUsers24h, aggStats] = await Promise.all([
+    // 2. Overview Counts & Aggregates (Real-time Online vs 24h Active)
+    const [totalUsers, activeUsersNow, activeUsers24h, aggStats] = await Promise.all([
       prisma.user.count(),
+      prisma.gameSave.count({
+        where: {
+          updatedAt: { gte: fiveMinutesAgo }
+        }
+      }),
       prisma.gameSave.count({
         where: {
           updatedAt: { gte: twentyFourHoursAgo }
@@ -46,31 +68,35 @@ export async function GET(request) {
       })
     ]);
 
-    // 3. Fetch Top 100 Players
+    // 3. Fetch All Users with GameSaves for complete aggregation
     const users = await prisma.user.findMany({
       include: {
         save: true,
         syndicate: true
       },
-      take: 100,
       orderBy: {
         updatedAt: 'desc'
       }
     });
 
-    const activePositions = [];
-    const recentTrades = [];
+    const allActivePositions = [];
+    const allRecentTrades = [];
 
-    const playerList = users.map(u => {
+    const allPlayerList = users.map(u => {
       const save = u.save;
       const history = Array.isArray(save?.tradeHistory) ? save.tradeHistory : [];
+      const lastActiveDate = save?.lastSavedAt ? new Date(save.lastSavedAt) : (u.updatedAt ? new Date(u.updatedAt) : new Date(u.createdAt));
+      const lastActiveMs = lastActiveDate ? lastActiveDate.getTime() : 0;
       
+      const isOnline = lastActiveMs > 0 && (now - lastActiveMs <= 5 * 60 * 1000);
+      const isActive24h = lastActiveMs > 0 && (now - lastActiveMs <= 24 * 60 * 60 * 1000);
+
       // Extract active positions
       const positions = save?.savePayload?.activePositions || (save?.activePosition ? [save.activePosition] : []);
       if (Array.isArray(positions)) {
         positions.forEach(pos => {
           if (pos && pos.entryPrice) {
-            activePositions.push({
+            allActivePositions.push({
               id: pos.id || `${u.username}-${pos.pairSymbol}`,
               username: u.username,
               userId: u.id,
@@ -87,8 +113,8 @@ export async function GET(request) {
       }
 
       // Collect trades for global trade feed
-      history.slice(-10).forEach(trade => {
-        recentTrades.push({
+      history.slice(-15).forEach(trade => {
+        allRecentTrades.push({
           ...trade,
           timestamp: trade.timestamp || (typeof trade.id === 'number' && trade.id > 1700000000000 ? trade.id : save.lastSavedAt),
           pairSymbol: trade.pairSymbol || trade.pair || 'DEGEN/USDT',
@@ -100,9 +126,12 @@ export async function GET(request) {
       return {
         id: u.id,
         username: u.username,
+        email: u.email || null,
         walletAddress: u.walletAddress,
         createdAt: u.createdAt,
-        lastActive: save?.lastSavedAt || u.updatedAt,
+        lastActive: lastActiveDate.toISOString(),
+        isOnline,
+        isActive24h,
         cash: save?.cash || 0,
         peakNetWorth: save?.peakNetWorth || 0,
         whaleTokens: save?.whaleTokens || 0,
@@ -115,13 +144,40 @@ export async function GET(request) {
     });
 
     // Sort players by peakNetWorth desc
-    playerList.sort((a, b) => b.peakNetWorth - a.peakNetWorth);
+    allPlayerList.sort((a, b) => b.peakNetWorth - a.peakNetWorth);
 
     // Sort recent trades by time desc
-    recentTrades.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    allRecentTrades.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
     // Sort active positions by margin desc
-    activePositions.sort((a, b) => b.margin - a.margin);
+    allActivePositions.sort((a, b) => b.margin - a.margin);
+
+    // Filter players by search and status
+    let filteredPlayers = allPlayerList;
+    if (searchPlayer) {
+      filteredPlayers = filteredPlayers.filter(p =>
+        p.username.toLowerCase().includes(searchPlayer) ||
+        (p.email && p.email.toLowerCase().includes(searchPlayer)) ||
+        (p.syndicateTag && p.syndicateTag.toLowerCase().includes(searchPlayer))
+      );
+    }
+    if (playerStatus === 'online') {
+      filteredPlayers = filteredPlayers.filter(p => p.isOnline);
+    } else if (playerStatus === 'active24h') {
+      filteredPlayers = filteredPlayers.filter(p => p.isActive24h);
+    }
+
+    // Paginate players
+    const totalPlayers = filteredPlayers.length;
+    const paginatedPlayers = filteredPlayers.slice((playersPage - 1) * playersLimit, playersPage * playersLimit);
+
+    // Paginate recent trades
+    const totalTrades = allRecentTrades.length;
+    const paginatedTrades = allRecentTrades.slice((tradesPage - 1) * tradesLimit, tradesPage * tradesLimit);
+
+    // Paginate active positions
+    const totalPositions = allActivePositions.length;
+    const paginatedPositions = allActivePositions.slice((positionsPage - 1) * positionsLimit, positionsPage * positionsLimit);
 
     // APM metrics
     const apm = telemetry.getMetrics();
@@ -133,17 +189,36 @@ export async function GET(request) {
       timestamp: new Date().toISOString(),
       overview: {
         totalUsers,
+        activeUsersNow,
         activeUsers24h,
         circulatingCash: aggStats._sum.cash || 0,
         totalPeakNetWorth: aggStats._sum.peakNetWorth || 0,
         totalWhaleTokens: aggStats._sum.whaleTokens || 0,
-        openPositionsCount: activePositions.length,
+        openPositionsCount: allActivePositions.length,
         dbLatencyMs
       },
       apm,
-      players: playerList,
-      activePositions: activePositions.slice(0, 50),
-      recentTrades: recentTrades.slice(0, 50)
+      players: paginatedPlayers,
+      playersPagination: {
+        page: playersPage,
+        limit: playersLimit,
+        total: totalPlayers,
+        totalPages: Math.max(1, Math.ceil(totalPlayers / playersLimit))
+      },
+      activePositions: paginatedPositions,
+      positionsPagination: {
+        page: positionsPage,
+        limit: positionsLimit,
+        total: totalPositions,
+        totalPages: Math.max(1, Math.ceil(totalPositions / positionsLimit))
+      },
+      recentTrades: paginatedTrades,
+      tradesPagination: {
+        page: tradesPage,
+        limit: tradesLimit,
+        total: totalTrades,
+        totalPages: Math.max(1, Math.ceil(totalTrades / tradesLimit))
+      }
     });
   } catch (error) {
     console.error('Error fetching admin metrics:', error);
