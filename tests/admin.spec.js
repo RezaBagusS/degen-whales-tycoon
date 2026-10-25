@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const adminKey = process.env.ADMIN_SECRET_KEY || 'dw_admin_9x7f2026_whale';
+
 test.describe('Admin & Ops Monitoring Dashboard', () => {
   test('rejects unauthenticated API requests to /api/admin/metrics', async ({ request }) => {
     const res = await request.get('/api/admin/metrics');
@@ -11,7 +13,7 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
   test('accepts authenticated API requests with x-admin-key', async ({ request }) => {
     const res = await request.get('/api/admin/metrics', {
       headers: {
-        'x-admin-key': 'degen_admin_2026'
+        'x-admin-key': adminKey
       }
     });
     expect(res.status()).toBe(200);
@@ -41,7 +43,7 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     await expect(page.getByRole('button', { name: /Buka Dashboard Ops/i })).toBeVisible();
 
     // Fill in secret key and submit
-    await page.locator('input[type="password"]').fill('degen_admin_2026');
+    await page.locator('input[type="password"]').fill(adminKey);
     await page.getByRole('button', { name: /Buka Dashboard Ops/i }).click();
 
     // Verify main ops center renders
