@@ -1404,6 +1404,12 @@ function TradingGame() {
   const [updateEmailLoading, setUpdateEmailLoading] = useState(false);
   const [updateEmailMsg, setUpdateEmailMsg] = useState(null);
 
+  // Email Prompt for users without email in DB
+  const [showEmailPromptModal, setShowEmailPromptModal] = useState(false);
+  const [emailPromptInput, setEmailPromptInput] = useState('');
+  const [emailPromptLoading, setEmailPromptLoading] = useState(false);
+  const [emailPromptMsg, setEmailPromptMsg] = useState(null);
+
   // Feature 1: Black Market Inventory & Power-Up States
   const [inventory, setInventory] = useState(initial.inventory || {
     pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0
@@ -1755,6 +1761,17 @@ function TradingGame() {
       if (!mounted) return;
       if (data?.user) {
         setCurrentUser(data.user);
+        // Prompt user without email in DB to add one
+        if (!data.user.email) {
+          try {
+            const dismissed = sessionStorage.getItem('degen_email_prompt_dismissed');
+            if (!dismissed) {
+              setTimeout(() => {
+                setShowEmailPromptModal(true);
+              }, 1200);
+            }
+          } catch {}
+        }
         const cloudSave = data.save?.savePayload;
         if (cloudSave && typeof cloudSave === 'object') {
           try {
@@ -1911,6 +1928,48 @@ function TradingGame() {
       setUpdateEmailLoading(false);
     }
   }, [emailInput]);
+
+  const handleDismissEmailPrompt = useCallback(() => {
+    setShowEmailPromptModal(false);
+    try {
+      sessionStorage.setItem('degen_email_prompt_dismissed', '1');
+    } catch {}
+  }, []);
+
+  const handleSavePromptEmail = useCallback(async (e) => {
+    if (e) e.preventDefault();
+    setEmailPromptMsg(null);
+    if (!emailPromptInput || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailPromptInput.trim())) {
+      setEmailPromptMsg({ type: 'error', text: 'Format email tidak valid.' });
+      return;
+    }
+
+    setEmailPromptLoading(true);
+    try {
+      const res = await fetch('/api/auth/update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailPromptInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailPromptMsg({ type: 'error', text: data.error || 'Gagal menyimpan email.' });
+      } else {
+        setEmailPromptMsg({ type: 'success', text: '✓ Email pemulihan berhasil ditautkan!' });
+        setCurrentUser((prev) => prev ? { ...prev, email: data.email } : prev);
+        try {
+          sessionStorage.setItem('degen_email_prompt_dismissed', '1');
+        } catch {}
+        setTimeout(() => {
+          setShowEmailPromptModal(false);
+        }, 1500);
+      }
+    } catch {
+      setEmailPromptMsg({ type: 'error', text: 'Terjadi kesalahan jaringan.' });
+    } finally {
+      setEmailPromptLoading(false);
+    }
+  }, [emailPromptInput]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -7847,6 +7906,26 @@ function TradingGame() {
                     </button>
                   </div>
 
+                  {/* Warning if account has NO recovery email */}
+                  {!currentUser.email && (
+                    <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 leading-snug">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                        <span>Email belum ditautkan! Wajib isi email agar akun dapat dipulihkan jika lupa password.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUpdateEmail(true);
+                          setUpdateEmailMsg(null);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] shrink-0 cursor-pointer transition-all"
+                      >
+                        Isi Email
+                      </button>
+                    </div>
+                  )}
+
                   {/* Security & Password Settings */}
                   <div className="pt-2 border-t border-slate-800 space-y-2">
                     <div className="flex items-center justify-between text-[11px]">
@@ -8709,6 +8788,89 @@ function TradingGame() {
           triggerToast(`Dana Talangan Cair 20%! +${formatMoney(recovery)} masuk ke kas.`, 'success');
         }}
       />
+
+      {/* Email Recovery Prompt Modal for users without email in DB */}
+      {showEmailPromptModal && currentUser && !currentUser.email && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#0B0F19] border border-amber-500/40 rounded-3xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden space-y-4">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500" />
+
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Mail className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-black text-sm text-white uppercase tracking-wide">
+                    Tautkan Email Pemulihan
+                  </h3>
+                  <span className="text-[11px] font-mono text-amber-400 font-bold">
+                    Penting untuk Keamanan Akun
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissEmailPrompt}
+                className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+              Halo Trader <strong className="text-white font-mono">@{currentUser.username}</strong>! Akun Anda belum memiliki email pemulihan yang terdaftar. Segera tautkan email aktif Anda agar dapat <strong>mereset password via OTP</strong> jika sewaktu-waktu Anda lupa kata sandi.
+            </p>
+
+            {emailPromptMsg && (
+              <div className={`p-2.5 rounded-xl text-xs font-mono flex items-center gap-2 ${emailPromptMsg.type === 'error' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                {emailPromptMsg.type === 'error' ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                <span>{emailPromptMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSavePromptEmail} className="space-y-3">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  placeholder="Ketik email Anda (contoh: nama@gmail.com)"
+                  value={emailPromptInput}
+                  onChange={(e) => setEmailPromptInput(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#111622] border border-slate-700 rounded-xl text-white font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDismissEmailPrompt}
+                  className="w-1/3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-mono font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Nanti Saja
+                </button>
+                <button
+                  type="submit"
+                  disabled={emailPromptLoading || !emailPromptInput}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 hover:from-amber-400 hover:to-orange-300 text-slate-950 font-mono font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-98 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {emailPromptLoading ? (
+                    <span>Menyimpan...</span>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Simpan &amp; Tautkan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Game Credits & Developer Modal */}
       <CreditsModal
