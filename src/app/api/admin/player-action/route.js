@@ -223,8 +223,8 @@ export async function POST(request) {
       }
 
       const defaultSave = {
-        cash: 100.0,
-        peakNetWorth: 100.0,
+        cash: 10.0,
+        peakNetWorth: 10.0,
         whaleTokens: 0,
         currentLocationLevel: 1,
         upgrades: {},
@@ -250,7 +250,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         success: true,
-        message: `Progres GameSave untuk @${user.username} berhasil direset ke status awal ($100 saldo pemula).`
+        message: `Progres GameSave untuk @${user.username} berhasil direset ke status awal ($10 saldo pemula).`
       });
     }
 

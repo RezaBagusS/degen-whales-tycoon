@@ -45,7 +45,7 @@ export async function GET(request) {
 
       const cleanedPayload = (typeof user.save.savePayload === 'object' && user.save.savePayload !== null)
         ? { ...user.save.savePayload }
-        : { cash: 100, peakNetWorth: 100, whaleTokens: 0 };
+        : { cash: 10, peakNetWorth: 10, whaleTokens: 0 };
       delete cleanedPayload.resetRequested;
 
       await prisma.gameSave.update({
@@ -60,7 +60,7 @@ export async function GET(request) {
         authenticated: false,
         resetRequired: true,
         redirectTo: '/auth?mode=login&reset=1',
-        message: 'Admin telah mereset data akun Anda ke saldo awal pemula ($100).'
+        message: 'Admin telah mereset data akun Anda ke saldo awal pemula ($10).'
       });
       response.cookies.delete(COOKIE_NAME);
       return response;

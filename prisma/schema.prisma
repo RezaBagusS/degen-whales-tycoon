@@ -40,8 +40,8 @@ model GameSave {
   userId               String   @unique
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  cash                 Float    @default(100.0)
-  peakNetWorth         Float    @default(100.0)
+  cash                 Float    @default(10.0)
+  peakNetWorth         Float    @default(10.0)
   whaleTokens          Int      @default(0)
   currentLocationLevel Int      @default(1)
   

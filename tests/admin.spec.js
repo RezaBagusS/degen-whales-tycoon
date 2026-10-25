@@ -352,7 +352,7 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     // 5. Test auth page renders the reset notice banner
     await page.goto('/auth?mode=login&reset=1');
     await expect(page.getByText(/NOTIFIKASI ADMIN: PROGRES DIRESET/i)).toBeVisible();
-    await expect(page.getByText(/saldo awal \(\$100 pemula\)/i)).toBeVisible();
+    await expect(page.getByText(/saldo awal \(\$10 pemula\)/i)).toBeVisible();
 
     // 6. Test suspend flow: admin bans user
     const banRes = await request.post('/api/admin/player-action', {

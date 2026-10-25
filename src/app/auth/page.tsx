@@ -69,7 +69,7 @@ export default function AuthPage() {
       } else if (isReset) {
         setAdminNotice({
           type: 'reset',
-          message: 'Progres akun Anda telah direset oleh Admin ke saldo awal ($100 pemula). Silakan login kembali.'
+          message: 'Progres akun Anda telah direset oleh Admin ke saldo awal ($10 pemula). Silakan login kembali.'
         });
         setTab('login');
       }

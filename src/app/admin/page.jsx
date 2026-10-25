@@ -748,7 +748,7 @@ export default function AdminDashboard() {
 
   const handleResetSave = async () => {
     if (!selectedPlayer) return;
-    const confirmReset = window.confirm(`Apakah Anda YAKIN ingin mereset seluruh progres akun @${selectedPlayer.username} ke $100 saldo awal? Tindakan ini tidak dapat dibatalkan!`);
+    const confirmReset = window.confirm(`Apakah Anda YAKIN ingin mereset seluruh progres akun @${selectedPlayer.username} ke $10 saldo awal? Tindakan ini tidak dapat dibatalkan!`);
     if (!confirmReset) return;
     setModActionLoading(true);
     setModActionMsg(null);
@@ -1664,7 +1664,7 @@ export default function AdminDashboard() {
                             {selectedPlayer.isBanned ? '✅ Status Banned & Buka Blokir (Unban)' : '🚫 Status Akun & Suspend / Blokir'}
                           </option>
                           <option value="compensation">🎁 Suntik Kas, Tokens &amp; Item In-Game (Kompensasi)</option>
-                          <option value="reset">🔄 Reset Progres Pemain ke Awal ($100)</option>
+                          <option value="reset">🔄 Reset Progres Pemain ke Awal ($10)</option>
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -1907,7 +1907,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 leading-tight">
-                          Kembalikan saldo kas akun ini ke $100, reset net worth, dan bersihkan seluruh item atau posisi korup.
+                          Kembalikan saldo kas akun ini ke $10, reset net worth, dan bersihkan seluruh item atau posisi korup.
                         </p>
                         <div className="pt-1 flex justify-end">
                           <button

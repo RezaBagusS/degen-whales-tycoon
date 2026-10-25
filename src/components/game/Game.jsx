@@ -1896,7 +1896,7 @@ function TradingGame() {
       sessionStorage.clear();
     } catch {}
 
-    // 3. Reset in-memory game state to initial anonymous $100
+    // 3. Reset in-memory game state to initial anonymous $10
     const fresh = loadGame();
     setCash(fresh.cash);
     setPeakNetWorth(fresh.peakNetWorth);
@@ -1914,7 +1914,7 @@ function TradingGame() {
         window.location.href = info?.redirectTo || `/auth?mode=login&banned=1&reason=${encodeURIComponent(reason)}`;
       }, 900);
     } else {
-      triggerToast('Progres akun Anda telah direset ke saldo awal ($100). Mengarahkan ke halaman login...', 'warning');
+      triggerToast('Progres akun Anda telah direset ke saldo awal ($10). Mengarahkan ke halaman login...', 'warning');
       setTimeout(() => {
         window.location.href = info?.redirectTo || '/auth?mode=login&reset=1';
       }, 900);
