@@ -137,15 +137,52 @@ export async function POST(request) {
         note: itemLogText ? `${reason} [Items: ${itemLogText}]` : reason
       };
 
+      // Compensation entry queue for delivery to active/idle player clients
+      const compensationEntry = {
+        id: `comp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString(),
+        cashDelta: isNaN(cashDelta) ? 0 : cashDelta,
+        whaleTokensDelta: isNaN(whaleTokensDelta) ? 0 : whaleTokensDelta,
+        itemId: itemId || null,
+        itemQty: itemQty || 0,
+        itemsDelta: itemsDelta || null,
+        itemNames: itemLogText || '',
+        reason: reason || 'Kompensasi / Bantuan Support Admin'
+      };
+
+      const existingPending = [
+        ...((Array.isArray(user.save.savePayload?.pendingCompensations)) ? user.save.savePayload.pendingCompensations : []),
+        ...((Array.isArray(user.save.activeEffects?.pendingCompensations)) ? user.save.activeEffects.pendingCompensations : [])
+      ];
+      // Keep unique by ID
+      const uniquePendingMap = new Map();
+      for (const p of existingPending) {
+        if (p && p.id) uniquePendingMap.set(p.id, p);
+      }
+      uniquePendingMap.set(compensationEntry.id, compensationEntry);
+      const updatedPending = Array.from(uniquePendingMap.values());
+
+      const existingEffects = (typeof user.save.activeEffects === 'object' && user.save.activeEffects !== null)
+        ? { ...user.save.activeEffects }
+        : {};
+      existingEffects.pendingCompensations = updatedPending;
+
       const existingPayload = typeof user.save.savePayload === 'object' && user.save.savePayload !== null
         ? {
             ...user.save.savePayload,
             cash: newCash,
             peakNetWorth: newPeak,
             whaleTokens: newTokens,
-            inventory: currentInventory
+            inventory: currentInventory,
+            pendingCompensations: updatedPending
           }
-        : null;
+        : {
+            cash: newCash,
+            peakNetWorth: newPeak,
+            whaleTokens: newTokens,
+            inventory: currentInventory,
+            pendingCompensations: updatedPending
+          };
 
       const updatedSave = await prisma.gameSave.update({
         where: { userId },
@@ -154,6 +191,7 @@ export async function POST(request) {
           peakNetWorth: newPeak,
           whaleTokens: newTokens,
           inventory: currentInventory,
+          activeEffects: existingEffects,
           tradeHistory: [compensationLog, ...existingHistory].slice(0, 50),
           savePayload: existingPayload,
           lastSavedAt: new Date()
@@ -168,6 +206,7 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         message: `Kompensasi berhasil disuntikkan ke akun @${user.username}: ${messageParts.join(', ') || 'Item diperbarui'}.`,
+        compensation: compensationEntry,
         save: {
           cash: updatedSave.cash,
           peakNetWorth: updatedSave.peakNetWorth,
@@ -197,10 +236,10 @@ export async function POST(request) {
           zero_fee: 0,
           insider_radar: 0
         },
-        activeEffects: { zeroFeeUntil: 0, has250xTicket: false, radarUntil: 0 },
+        activeEffects: { zeroFeeUntil: 0, has250xTicket: false, radarUntil: 0, resetRequested: true },
         activePosition: null,
         tradeHistory: [],
-        savePayload: null,
+        savePayload: { resetRequested: true },
         lastSavedAt: new Date()
       };
 

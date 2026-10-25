@@ -26,6 +26,12 @@ export async function GET(request) {
       return NextResponse.json({ authenticated: false });
     }
 
+    const rawPending = [
+      ...((Array.isArray(user.save?.savePayload?.pendingCompensations)) ? user.save.savePayload.pendingCompensations : []),
+      ...((Array.isArray(user.save?.activeEffects?.pendingCompensations)) ? user.save.activeEffects.pendingCompensations : [])
+    ];
+    const uniquePending = Array.from(new Map(rawPending.map(c => [c.id, c])).values());
+
     return NextResponse.json({
       authenticated: true,
       user: {
@@ -34,7 +40,8 @@ export async function GET(request) {
         email: user.email || null,
         syndicate: user.syndicate
       },
-      save: user.save?.savePayload || user.save
+      save: user.save?.savePayload || user.save,
+      pendingCompensations: uniquePending
     });
   } catch (error) {
     console.error('Error in /api/auth/me:', error);

@@ -45,11 +45,18 @@ export async function GET(request) {
       });
     }
 
+    const rawPending = [
+      ...((Array.isArray(user.save?.savePayload?.pendingCompensations)) ? user.save.savePayload.pendingCompensations : []),
+      ...((Array.isArray(user.save?.activeEffects?.pendingCompensations)) ? user.save.activeEffects.pendingCompensations : [])
+    ];
+    const uniquePending = Array.from(new Map(rawPending.map(c => [c.id, c])).values());
+
     return NextResponse.json({
       found: true,
       username: user.username,
       syndicate: user.syndicate,
-      save: user.save.savePayload || user.save
+      save: user.save.savePayload || user.save,
+      pendingCompensations: uniquePending
     });
   } catch (error) {
     console.error('Error loading game progress from DB:', error);

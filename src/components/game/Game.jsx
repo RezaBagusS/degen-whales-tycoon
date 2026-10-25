@@ -1380,6 +1380,12 @@ function TradingGame() {
     };
   }, []);
 
+  // Developer Compensation In-Game Banner & Dismissal State
+  const [receivedCompensation, setReceivedCompensation] = useState(null);
+  const [compensationDismissed, setCompensationDismissed] = useState(false);
+  const currentUserRef = useRef(null);
+  const applyCompensationUpdateRef = useRef(null);
+
   const [activePositions, setActivePositions] = useState(() => {
     if (Array.isArray(initial.activePositions)) return initial.activePositions;
     if (initial.activePosition) return [initial.activePosition];
@@ -1425,6 +1431,10 @@ function TradingGame() {
   const [toastMessage, setToastMessage] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // Password & Email Settings States
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -1792,6 +1802,86 @@ function TradingGame() {
     setToastMessage({ msg, type, id: Date.now() });
   }, []);
 
+  const applyCompensationUpdate = useCallback((compensations, appliedValues) => {
+    if (!compensations || compensations.length === 0) return;
+
+    const latestComp = compensations[compensations.length - 1];
+    if (!latestComp) return;
+
+    let alreadyDismissed = false;
+    try {
+      const dismissedIds = JSON.parse(localStorage.getItem('degen_dismissed_compensations') || '[]');
+      if (dismissedIds.includes(latestComp.id)) {
+        alreadyDismissed = true;
+      }
+    } catch {}
+
+    if (appliedValues) {
+      if (typeof appliedValues.cash === 'number') {
+        setCash(appliedValues.cash);
+      }
+      if (typeof appliedValues.peakNetWorth === 'number') {
+        setPeakNetWorth(prev => Math.max(prev, appliedValues.peakNetWorth));
+      }
+      if (typeof appliedValues.whaleTokens === 'number') {
+        setWhaleTokens(appliedValues.whaleTokens);
+      }
+      if (appliedValues.inventory && typeof appliedValues.inventory === 'object') {
+        setInventory(prev => ({ ...prev, ...appliedValues.inventory }));
+      }
+    } else {
+      let addCash = 0;
+      let addTokens = 0;
+      const invDelta = {};
+      for (const comp of compensations) {
+        addCash += (Number(comp.cashDelta) || 0);
+        addTokens += (Number(comp.whaleTokensDelta) || 0);
+        if (comp.itemId && comp.itemQty) {
+          invDelta[comp.itemId] = (invDelta[comp.itemId] || 0) + comp.itemQty;
+        }
+        if (comp.itemsDelta && typeof comp.itemsDelta === 'object') {
+          for (const [k, v] of Object.entries(comp.itemsDelta)) {
+            invDelta[k] = (invDelta[k] || 0) + (parseInt(v, 10) || 0);
+          }
+        }
+      }
+      if (addCash !== 0) setCash(prev => Math.max(0, prev + addCash));
+      if (addTokens !== 0) setWhaleTokens(prev => Math.max(0, prev + addTokens));
+      if (Object.keys(invDelta).length > 0) {
+        setInventory(prev => {
+          const next = { ...prev };
+          for (const [k, v] of Object.entries(invDelta)) {
+            next[k] = Math.max(0, (parseInt(next[k], 10) || 0) + v);
+          }
+          return next;
+        });
+      }
+    }
+
+    if (!alreadyDismissed) {
+      setReceivedCompensation(latestComp);
+      setCompensationDismissed(false);
+      triggerToast('🎁 Hadiah Kompensasi dari Developer telah diterima!', 'success');
+      playProfitSound();
+    }
+  }, [triggerToast]);
+
+  applyCompensationUpdateRef.current = applyCompensationUpdate;
+
+  const handleDismissCompensation = useCallback(() => {
+    setCompensationDismissed(true);
+    if (receivedCompensation?.id) {
+      try {
+        const dismissedIds = JSON.parse(localStorage.getItem('degen_dismissed_compensations') || '[]');
+        if (!dismissedIds.includes(receivedCompensation.id)) {
+          dismissedIds.push(receivedCompensation.id);
+          localStorage.setItem('degen_dismissed_compensations', JSON.stringify(dismissedIds.slice(-20)));
+        }
+      } catch {}
+    }
+    triggerToast('Kompensasi ditutup & tersimpan aman di akun Anda.', 'info');
+  }, [receivedCompensation, triggerToast]);
+
   // Cloud Sync & Account State Hydration
   useEffect(() => {
     let mounted = true;
@@ -1809,6 +1899,10 @@ function TradingGame() {
               }, 1200);
             }
           } catch {}
+        }
+        // Handle pending developer compensation upon initial hydration
+        if (data.pendingCompensations && data.pendingCompensations.length > 0) {
+          applyCompensationUpdate(data.pendingCompensations, data.save);
         }
         const cloudSave = data.save?.savePayload;
         if (cloudSave && typeof cloudSave === 'object') {
@@ -1845,16 +1939,19 @@ function TradingGame() {
     return () => {
       mounted = false;
     };
-  }, [triggerToast]);
+  }, [triggerToast, applyCompensationUpdate]);
 
   const handleManualCloudSync = useCallback(async () => {
     if (!currentUser || isSyncingCloud) return;
     setIsSyncingCloud(true);
     try {
       if (!latest.current) return;
-      const res = await syncGameProgressToDB(latest.current, true);
+      const res = await syncGameProgressToDB(latest.current, true, currentUser?.username);
       if (res?.success) {
         triggerToast(`Progres game tersinkronkan ke Cloud Akun @${currentUser.username}!`, 'success');
+        if (res.compensations && res.compensations.length > 0) {
+          applyCompensationUpdate(res.compensations, res.appliedValues);
+        }
       } else {
         triggerToast('Gagal sinkronisasi ke cloud server.', 'warning');
       }
@@ -3114,7 +3211,16 @@ function TradingGame() {
       }));
       setSaveError(false);
       // Background sync to PostgreSQL database
-      syncGameProgressToDB(state);
+      syncGameProgressToDB(state, false, currentUserRef.current?.username).then((res) => {
+        if (res?.resetRequired) {
+          triggerToast('Akun Anda telah direset oleh Admin ke saldo awal.', 'warning');
+          setTimeout(() => window.location.reload(), 1200);
+          return;
+        }
+        if (res?.compensations && res.compensations.length > 0) {
+          applyCompensationUpdateRef.current?.(res.compensations, res.appliedValues);
+        }
+      });
     } catch {
       // Fallback: If full payload fails (e.g. QuotaExceededError), try saving essential core progress without heavy candles
       try {
@@ -5530,6 +5636,66 @@ function TradingGame() {
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>
+      )}
+      {/* Developer Compensation In-Game Banner */}
+      {receivedCompensation && !compensationDismissed && (
+        <div
+          data-testid="developer-compensation-banner"
+          className="border-b px-4 py-2.5 text-xs font-medium shadow-xl transition-all animate-in fade-in slide-in-from-top-2 duration-300 bg-gradient-to-r from-emerald-950 via-slate-900 to-cyan-950 border-emerald-500/60 text-slate-100"
+        >
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 shadow-sm shadow-[#00FF88]/20">
+                <Gift className="w-4 h-4 text-[#00FF88] animate-bounce" />
+              </div>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/25 text-[#00FF88] border border-emerald-500/40 shrink-0">
+                    🎁 KOMPENSASI DEVELOPER
+                  </span>
+                  {receivedCompensation.cashDelta > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-[#00FF88] border border-emerald-500/30 shrink-0">
+                      +${receivedCompensation.cashDelta.toLocaleString()} Kas
+                    </span>
+                  )}
+                  {receivedCompensation.whaleTokensDelta > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
+                      +{receivedCompensation.whaleTokensDelta} Tokens
+                    </span>
+                  )}
+                  {(receivedCompensation.itemNames || (receivedCompensation.itemId && receivedCompensation.itemQty > 0)) && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                      📦 {receivedCompensation.itemNames || `+${receivedCompensation.itemQty} Item`}
+                    </span>
+                  )}
+                </div>
+                <p className="truncate text-xs text-slate-200">
+                  <span className="text-slate-400 font-semibold">Pesan Developer:</span> "{receivedCompensation.reason || 'Kompensasi / Bantuan Support Admin'}"
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={handleDismissCompensation}
+                className="px-3 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/35 text-[#00FF88] border border-emerald-500/40 text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                title="Klaim dan tutup notifikasi"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Klaim & Tutup</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDismissCompensation}
+                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0 cursor-pointer"
+                title="Tutup banner"
+                aria-label="Tutup kompensasi"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

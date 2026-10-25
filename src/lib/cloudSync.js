@@ -34,7 +34,7 @@ export async function fetchCurrentUser() {
 /**
  * Sync game state to database
  */
-export async function syncGameProgressToDB(gameState, force = false) {
+export async function syncGameProgressToDB(gameState, force = false, username = null) {
   if (typeof window === 'undefined') return null;
 
   const now = Date.now();
@@ -45,7 +45,8 @@ export async function syncGameProgressToDB(gameState, force = false) {
 
   try {
     const payload = {
-      state: gameState
+      state: gameState,
+      username: username || gameState?.username || null
     };
 
     const res = await fetch('/api/user/save', {
