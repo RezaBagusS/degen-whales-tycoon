@@ -920,7 +920,7 @@ export default function AdminDashboard() {
   const paginatedApmErrors = allApmErrors.slice((apmPage - 1) * apmLimit, apmPage * apmLimit);
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans overflow-x-hidden">
       {/* Top Header Bar */}
       <header className="border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -1011,12 +1011,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
+      <main className="flex-1 max-w-7xl w-full min-w-0 mx-auto p-4 sm:p-6 flex flex-col gap-5 overflow-x-hidden">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2 overflow-x-auto scrollbar-none w-full min-w-0 max-w-full">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
               activeTab === 'overview'
                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -1028,7 +1028,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('players')}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
               activeTab === 'players'
                 ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -1040,7 +1040,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('risk')}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
               activeTab === 'risk'
                 ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -1052,7 +1052,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('launchpad')}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
               activeTab === 'launchpad'
                 ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -1064,7 +1064,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('apm')}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
               activeTab === 'apm'
                 ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
