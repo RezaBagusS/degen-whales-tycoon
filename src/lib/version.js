@@ -8,6 +8,6 @@
  * - PATCH: Backward-compatible bug fixes and telemetry adjustments
  */
 
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.6.1';
 export const APP_DISPLAY_VERSION = `v${APP_VERSION}`;
-export const APP_BUILD_NAME = 'Degen & Whale: Ops, Broadcast & Live Management';
+export const APP_BUILD_NAME = 'Degen & Whale: Multi-Item Support Compensation & Live Ops';

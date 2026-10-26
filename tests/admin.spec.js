@@ -305,6 +305,63 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     }
   });
 
+  test('admin can inject multiple in-game items simultaneously (e.g. God Leverage and Insider Alpha Radar)', async ({ request }) => {
+    const metricsRes = await request.get('/api/admin/metrics?playersLimit=1', {
+      headers: { 'x-admin-key': adminKey }
+    });
+    expect(metricsRes.status()).toBe(200);
+    const metricsJson = await metricsRes.json();
+    const testPlayer = metricsJson.players[0];
+    expect(testPlayer).toBeDefined();
+
+    // Inject multiple items simultaneously
+    const compRes = await request.post('/api/admin/player-action', {
+      headers: { 'x-admin-key': adminKey },
+      data: {
+        action: 'inject_compensation',
+        userId: testPlayer.id,
+        cashDelta: 50000,
+        whaleTokensDelta: 15,
+        itemsDelta: {
+          leverage_250x: 3,
+          insider_radar: 2
+        },
+        reason: 'Paket Kompensasi Multi-Item Spesial'
+      }
+    });
+    expect(compRes.status()).toBe(200);
+    const compJson = await compRes.json();
+    expect(compJson.success).toBe(true);
+    expect(compJson.compensation).toBeDefined();
+    expect(compJson.compensation.itemNames).toContain('God Leverage 250x Ticket');
+    expect(compJson.compensation.itemNames).toContain('Insider Alpha Radar');
+    expect(compJson.compensation.itemsDelta.leverage_250x).toBe(3);
+    expect(compJson.compensation.itemsDelta.insider_radar).toBe(2);
+
+    // Save and verify client hydration receives all injected items
+    const saveRes = await request.post('/api/user/save', {
+      data: {
+        username: testPlayer.username,
+        state: {
+          cash: 200,
+          peakNetWorth: 200,
+          whaleTokens: 1,
+          inventory: {
+            leverage_250x: 1,
+            insider_radar: 0
+          }
+        }
+      }
+    });
+    expect(saveRes.status()).toBe(200);
+    const saveJson = await saveRes.json();
+    expect(saveJson.success).toBe(true);
+    expect(saveJson.appliedValues.cash).toBe(50200);
+    expect(saveJson.appliedValues.whaleTokens).toBe(16);
+    expect(saveJson.appliedValues.inventory.leverage_250x).toBe(4); // 1 + 3
+    expect(saveJson.appliedValues.inventory.insider_radar).toBe(2);  // 0 + 2
+  });
+
   test('admin reset progress redirects to login, resets to anon, and prevents reload loops', async ({ request, page }) => {
     // 1. Get a user
     const metricsRes = await request.get('/api/admin/metrics?playersLimit=1', {

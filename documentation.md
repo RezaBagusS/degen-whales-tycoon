@@ -2,8 +2,8 @@
 
 Dokumentasi game dan proyek Next.js
 
-- Versi game: **1.6.0**
-- Basis kode: **Degen & Whale Ops, Broadcast & Live Management Edition**
+- Versi game: **1.6.1**
+- Basis kode: **Degen & Whale Multi-Item Support Compensation & Live Ops Edition**
 - Tanggal dokumentasi: **26 Oktober 2026**
 - Bahasa antarmuka: Indonesia & English
 - Genre: idle tycoon dan simulasi trading fiktif
@@ -1066,6 +1066,15 @@ Endpoint aksi terpadu `/api/admin/player-action` menyediakan kontrol moderasi da
   - Banner menampilkan rincian cash, token, dan item yang diterima serta tombol tutup/klaim manual yang responsif.
 
 ## 28. Catatan Rilis & Changelog Versi
+
+### Versi 1.6.1 (26 Oktober 2026) — Multi-Item Support Compensation & Live Ops
+- **Fitur Baru & Penyempurnaan**:
+  - **Multi-Item Admin Compensation Builder**: Admin dapat memilih dan menyuntikkan lebih dari 1 jenis item Black Market sekaligus dalam satu paket kompensasi (misalnya God Leverage 250x Ticket + Insider Alpha Radar + Zero-Fee VIP Pass).
+  - **Dynamic Item Row Management**: Tombol `+ Tambah Item Lain` dinamis dengan seleksi item bebas duplikasi (`(Sudah dipilih)`), pengaturan jumlah per item, serta tombol hapus baris.
+  - **Robust Backend Consolidation**: Endpoint `/api/admin/player-action` mengonsolidasikan `itemsDelta` tanpa redundansi atau duplicate counting dan menyusun log transparan ke `tradeHistory`.
+  - **Safe Client & Cloud Save Merge**: Penambahan proteksi sinkronisasi inventaris multi-item di `/api/user/save` dan `src/components/game/Game.jsx` agar banner in-game merender seluruh item yang disuntikkan secara akurat.
+- **Pengujian & Verifikasi**:
+  - Penambahan automated test suite Playwright `admin can inject multiple in-game items simultaneously (e.g. God Leverage and Insider Alpha Radar)`. Seluruh 12 admin tests dan 19 game tests lolos 100%.
 
 ### Versi 1.6.0 (26 Oktober 2026) — Ops, Broadcast & Live Management
 - **Fitur Baru**:

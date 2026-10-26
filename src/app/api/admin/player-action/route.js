@@ -127,25 +127,26 @@ export async function POST(request) {
         ? { ...user.save.savePayload.inventory }
         : { pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0 };
 
-      let itemLogText = '';
-      if (itemId && itemQty !== 0 && ITEM_NAMES[itemId]) {
-        currentInventory[itemId] = Math.max(0, (parseInt(currentInventory[itemId], 10) || 0) + itemQty);
-        itemLogText = `${itemQty >= 0 ? '+' : ''}${itemQty} ${ITEM_NAMES[itemId]}`;
-      }
-
+      // Consolidate multi-item injection with backward compatibility
+      const finalItemsDelta = {};
       if (typeof itemsDelta === 'object' && itemsDelta !== null) {
-        const addedItems = [];
         for (const [k, v] of Object.entries(itemsDelta)) {
           const qty = parseInt(v, 10) || 0;
           if (qty !== 0 && ITEM_NAMES[k]) {
-            currentInventory[k] = Math.max(0, (parseInt(currentInventory[k], 10) || 0) + qty);
-            addedItems.push(`${qty >= 0 ? '+' : ''}${qty} ${ITEM_NAMES[k]}`);
+            finalItemsDelta[k] = (finalItemsDelta[k] || 0) + qty;
           }
         }
-        if (addedItems.length > 0) {
-          itemLogText = addedItems.join(', ');
-        }
       }
+      if (itemId && itemQty !== 0 && ITEM_NAMES[itemId] && !finalItemsDelta[itemId]) {
+        finalItemsDelta[itemId] = (finalItemsDelta[itemId] || 0) + itemQty;
+      }
+
+      const addedItems = [];
+      for (const [k, qty] of Object.entries(finalItemsDelta)) {
+        currentInventory[k] = Math.max(0, (parseInt(currentInventory[k], 10) || 0) + qty);
+        addedItems.push(`${qty >= 0 ? '+' : ''}${qty} ${ITEM_NAMES[k]}`);
+      }
+      const itemLogText = addedItems.join(', ');
 
       // Append compensation log into tradeHistory for transparency
       const existingHistory = Array.isArray(user.save.tradeHistory) ? user.save.tradeHistory : [];
@@ -162,14 +163,16 @@ export async function POST(request) {
       };
 
       // Compensation entry queue for delivery to active/idle player clients
+      const firstItemId = Object.keys(finalItemsDelta)[0] || null;
+      const firstItemQty = firstItemId ? finalItemsDelta[firstItemId] : 0;
       const compensationEntry = {
         id: `comp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         timestamp: new Date().toISOString(),
         cashDelta: isNaN(cashDelta) ? 0 : cashDelta,
         whaleTokensDelta: isNaN(whaleTokensDelta) ? 0 : whaleTokensDelta,
-        itemId: itemId || null,
-        itemQty: itemQty || 0,
-        itemsDelta: itemsDelta || null,
+        itemId: firstItemId,
+        itemQty: firstItemQty,
+        itemsDelta: Object.keys(finalItemsDelta).length > 0 ? finalItemsDelta : null,
         itemNames: itemLogText || '',
         reason: reason || 'Kompensasi / Bantuan Support Admin'
       };

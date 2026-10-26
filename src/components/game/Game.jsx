@@ -1841,13 +1841,12 @@ function TradingGame() {
       for (const comp of compensations) {
         addCash += (Number(comp.cashDelta) || 0);
         addTokens += (Number(comp.whaleTokensDelta) || 0);
-        if (comp.itemId && comp.itemQty) {
-          invDelta[comp.itemId] = (invDelta[comp.itemId] || 0) + comp.itemQty;
-        }
-        if (comp.itemsDelta && typeof comp.itemsDelta === 'object') {
+        if (comp.itemsDelta && typeof comp.itemsDelta === 'object' && Object.keys(comp.itemsDelta).length > 0) {
           for (const [k, v] of Object.entries(comp.itemsDelta)) {
             invDelta[k] = (invDelta[k] || 0) + (parseInt(v, 10) || 0);
           }
+        } else if (comp.itemId && comp.itemQty) {
+          invDelta[comp.itemId] = (invDelta[comp.itemId] || 0) + comp.itemQty;
         }
       }
       if (addCash !== 0) setCash(prev => Math.max(0, prev + addCash));

@@ -34,7 +34,10 @@ import {
   Gift,
   RotateCcw,
   BarChart2,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  Trash2,
+  Package
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -399,12 +402,32 @@ export default function AdminDashboard() {
   const [banReasonInput, setBanReasonInput] = useState('');
   const [compCash, setCompCash] = useState('');
   const [compTokens, setCompTokens] = useState('');
-  const [compItemId, setCompItemId] = useState('');
-  const [compItemQty, setCompItemQty] = useState('');
+  const [compItems, setCompItems] = useState([{ id: '', qty: 1 }]);
   const [compReason, setCompReason] = useState('');
   const [modActionLoading, setModActionLoading] = useState(false);
   const [modActionMsg, setModActionMsg] = useState(null);
   const [activeModTool, setActiveModTool] = useState(''); // '' | 'password' | 'ban' | 'compensation' | 'reset'
+
+  const handleAddCompItemRow = () => {
+    if (compItems.length < GAME_ITEMS.length) {
+      setCompItems(prev => [...prev, { id: '', qty: 1 }]);
+    }
+  };
+
+  const handleRemoveCompItemRow = (index) => {
+    setCompItems(prev => {
+      const next = prev.filter((_, idx) => idx !== index);
+      return next.length > 0 ? next : [{ id: '', qty: 1 }];
+    });
+  };
+
+  const handleCompItemChange = (index, field, value) => {
+    setCompItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
 
   // Load saved admin key from sessionStorage on mount
   useEffect(() => {
@@ -699,15 +722,25 @@ export default function AdminDashboard() {
     if (!selectedPlayer) return;
     const cashVal = parseFloat(compCash || 0);
     const tokenVal = parseInt(compTokens || 0, 10);
-    const itemQtyVal = parseInt(compItemQty || 0, 10);
 
-    if (!cashVal && !tokenVal && (!compItemId || !itemQtyVal)) {
-      setModActionMsg({ type: 'error', text: 'Masukkan jumlah Kas ($), Whale Tokens, atau Item yang ingin disuntikkan.' });
+    const itemsDelta = {};
+    for (const item of compItems) {
+      const qty = parseInt(item.qty, 10);
+      if (item.id && qty > 0) {
+        itemsDelta[item.id] = (itemsDelta[item.id] || 0) + qty;
+      }
+    }
+    const hasItems = Object.keys(itemsDelta).length > 0;
+
+    if (!cashVal && !tokenVal && !hasItems) {
+      setModActionMsg({ type: 'error', text: 'Masukkan jumlah Kas ($), Whale Tokens, atau minimal 1 Item yang ingin disuntikkan.' });
       return;
     }
     setModActionLoading(true);
     setModActionMsg(null);
     try {
+      const firstItemId = Object.keys(itemsDelta)[0] || undefined;
+      const firstItemQty = firstItemId ? itemsDelta[firstItemId] : undefined;
       const res = await fetch('/api/admin/player-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
@@ -716,8 +749,9 @@ export default function AdminDashboard() {
           userId: selectedPlayer.id,
           cashDelta: cashVal,
           whaleTokensDelta: tokenVal,
-          itemId: compItemId || undefined,
-          itemQty: itemQtyVal,
+          itemId: firstItemId,
+          itemQty: firstItemQty,
+          itemsDelta: itemsDelta,
           reason: compReason || 'Kompensasi / Bantuan Support Admin'
         })
       });
@@ -734,8 +768,7 @@ export default function AdminDashboard() {
         } : null);
         setCompCash('');
         setCompTokens('');
-        setCompItemId('');
-        setCompItemQty('');
+        setCompItems([{ id: '', qty: 1 }]);
         setCompReason('');
         fetchMetrics(adminKey);
       }
@@ -1513,8 +1546,7 @@ export default function AdminDashboard() {
                                 setBanReasonInput(player.banReason || '');
                                 setCompCash('');
                                 setCompTokens('');
-                                setCompItemId('');
-                                setCompItemQty('');
+                                setCompItems([{ id: '', qty: 1 }]);
                                 setCompReason('');
                               }}
                               className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
@@ -1841,36 +1873,71 @@ export default function AdminDashboard() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] text-slate-400 block mb-0.5">Suntik Item In-Game:</label>
-                              <select
-                                value={compItemId}
-                                onChange={(e) => {
-                                  setCompItemId(e.target.value);
-                                  if (e.target.value && !compItemQty) setCompItemQty('1');
-                                }}
-                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-sky-400 cursor-pointer"
-                              >
-                                <option value="">-- Pilih Item (Opsional) --</option>
-                                {GAME_ITEMS.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {item.icon} {item.name}
-                                  </option>
-                                ))}
-                              </select>
+                          {/* Multi-Item Compensation Builder */}
+                          <div className="space-y-1.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] text-slate-300 font-semibold flex items-center gap-1">
+                                <Package className="w-3.5 h-3.5 text-purple-400" />
+                                Suntik Item In-Game (Bisa Banyak Jenis):
+                              </label>
+                              {compItems.length < GAME_ITEMS.length && (
+                                <button
+                                  type="button"
+                                  onClick={handleAddCompItemRow}
+                                  className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium px-2 py-0.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition-all cursor-pointer"
+                                >
+                                  <Plus className="w-3 h-3" /> Tambah Item Lain
+                                </button>
+                              )}
                             </div>
-                            <div>
-                              <label className="text-[10px] text-slate-400 block mb-0.5">Jumlah Item:</label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={compItemQty}
-                                onChange={(e) => setCompItemQty(e.target.value)}
-                                placeholder="Contoh: 1"
-                                disabled={!compItemId}
-                                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-purple-300 placeholder:text-slate-600 outline-none focus:border-sky-400 disabled:opacity-50"
-                              />
+
+                            <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
+                              {compItems.map((row, idx) => {
+                                const selectedItemIds = compItems.map(it => it.id).filter(Boolean);
+                                return (
+                                  <div key={idx} className="flex items-center gap-2 bg-slate-950/70 p-1.5 rounded-xl border border-slate-800/80">
+                                    <div className="flex-1">
+                                      <select
+                                        value={row.id}
+                                        onChange={(e) => handleCompItemChange(idx, 'id', e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-sky-400 cursor-pointer"
+                                      >
+                                        <option value="">-- Pilih Item (Opsional) --</option>
+                                        {GAME_ITEMS.map((item) => {
+                                          const isAlreadyChosen = selectedItemIds.includes(item.id) && row.id !== item.id;
+                                          return (
+                                            <option key={item.id} value={item.id} disabled={isAlreadyChosen}>
+                                              {item.icon} {item.name} {isAlreadyChosen ? '(Sudah dipilih)' : ''}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                    </div>
+                                    <div className="w-24 flex items-center gap-1">
+                                      <span className="text-[10px] text-slate-500 font-mono">Qty:</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={row.qty}
+                                        onChange={(e) => handleCompItemChange(idx, 'qty', e.target.value)}
+                                        disabled={!row.id}
+                                        placeholder="1"
+                                        className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-purple-300 placeholder:text-slate-600 outline-none focus:border-sky-400 disabled:opacity-50 font-bold text-center"
+                                      />
+                                    </div>
+                                    {compItems.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveCompItemRow(idx)}
+                                        title="Hapus baris item"
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -1884,7 +1951,7 @@ export default function AdminDashboard() {
                             />
                             <button
                               type="submit"
-                              disabled={modActionLoading || (!compCash && !compTokens && (!compItemId || !compItemQty))}
+                              disabled={modActionLoading || (!compCash && !compTokens && !compItems.some(i => i.id && parseInt(i.qty, 10) > 0))}
                               className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shrink-0"
                             >
                               {modActionLoading ? 'Menyuntikkan...' : '🎁 Suntik Kompensasi'}
@@ -1945,8 +2012,7 @@ export default function AdminDashboard() {
                         setBanReasonInput('');
                         setCompCash('');
                         setCompTokens('');
-                        setCompItemId('');
-                        setCompItemQty('');
+                        setCompItems([{ id: '', qty: 1 }]);
                         setCompReason('');
                       }}
                       className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
