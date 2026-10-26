@@ -89,6 +89,8 @@ import { ADS_CONFIG } from '../../config/adsConfig';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 import RewardedAdModal from './RewardedAdModal';
 import CreditsModal from './CreditsModal';
+import DailyStreakModal from './DailyStreakModal';
+import { getLocalDateString, getYesterdayDateString, evaluateStreakStatus } from '../../lib/dailyStreak';
 import { syncGameProgressToDB, fetchCurrentUser, logoutUser, loadGameProgressFromDB } from '../../lib/cloudSync';
 import { liveCryptoFeed } from '../../lib/liveCryptoFeed';
 import {
@@ -963,7 +965,8 @@ function loadGame() {
     dailyQuestState: { ...initialDailyQuestState },
     inventory: { pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0 },
     activeEffects: { zeroFeeUntil: 0, has250xTicket: false, radarUntil: 0 },
-    dailyWhaleUsage: { lastWhistleDate: null, lastDumpDate: null }
+    dailyWhaleUsage: { lastWhistleDate: null, lastDumpDate: null },
+    dailyStreak: { streakCount: 0, currentDay: 1, lastClaimDate: null, lastClaimTime: 0, freezeUsed: false, badgeUnlocked: false }
   };
   const initialAnchor = fresh.marketPrices[0] || MARKET_PAIRS[0].basePrice;
   fresh.candlesticksByTf = generateSynchronousCandlesForPair(0, initialAnchor);
@@ -1099,6 +1102,14 @@ function loadGame() {
       inventory: validInventory,
       activeEffects: validEffects,
       dailyWhaleUsage: (saved.dailyWhaleUsage && typeof saved.dailyWhaleUsage === 'object') ? saved.dailyWhaleUsage : { ...fresh.dailyWhaleUsage },
+      dailyStreak: (saved.dailyStreak && typeof saved.dailyStreak === 'object') ? {
+        streakCount: finiteNonnegative(saved.dailyStreak.streakCount, 0),
+        currentDay: Math.min(7, Math.max(1, parseInt(saved.dailyStreak.currentDay || 1, 10))),
+        lastClaimDate: saved.dailyStreak.lastClaimDate || null,
+        lastClaimTime: finiteNonnegative(saved.dailyStreak.lastClaimTime, 0),
+        freezeUsed: Boolean(saved.dailyStreak.freezeUsed),
+        badgeUnlocked: Boolean(saved.dailyStreak.badgeUnlocked)
+      } : { ...fresh.dailyStreak },
       cash: finiteNonnegative(saved.cash, 10) + earned,
       peakNetWorth: peak, whaleTokens: tokens, passiveLevels: levels,
       lastDailyClaim: Math.min(Date.now(), finiteNonnegative(saved.lastDailyClaim)),
@@ -1475,6 +1486,15 @@ function TradingGame() {
   const [dailyWhaleUsage, setDailyWhaleUsage] = useState(initial.dailyWhaleUsage || {
     lastWhistleDate: null, lastDumpDate: null
   });
+  const [dailyStreak, setDailyStreak] = useState(initial.dailyStreak || {
+    streakCount: 0,
+    currentDay: 1,
+    lastClaimDate: null,
+    lastClaimTime: 0,
+    freezeUsed: false,
+    badgeUnlocked: false
+  });
+  const [showDailyStreakModal, setShowDailyStreakModal] = useState(false);
   const [whaleWarBanner, setWhaleWarBanner] = useState(false);
   const whaleActionHistoryRef = useRef([]);
   const meanReversionRef = useRef({ deltaPerStep: 0, stepsLeft: 0 });
@@ -3085,10 +3105,13 @@ function TradingGame() {
   }, [modalPosition, adjustSlInput]);
 
   const isDailyClaimed = useMemo(() => {
+    if (dailyStreak?.lastClaimDate && dailyStreak.lastClaimDate === getLocalDateString()) {
+      return true;
+    }
     if (!lastDailyClaim || lastDailyClaim <= 0) return false;
     const cooldownMs = 24 * 60 * 60 * 1000;
     return (Date.now() - lastDailyClaim) < cooldownMs;
-  }, [lastDailyClaim]);
+  }, [lastDailyClaim, dailyStreak]);
 
   // 3-Minute Cooldown logic for $5 Cash Ad Button (re-evaluates with candleTick)
   const isCashAdCoolingDown = Date.now() - (lastCashAdClaim || 0) < CASH_AD_COOLDOWN_MS;
@@ -3256,7 +3279,7 @@ function TradingGame() {
       tradeHistory, launchpadHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
-      inventory, activeEffects, dailyWhaleUsage
+      inventory, activeEffects, dailyWhaleUsage, dailyStreak
     };
   });
 
@@ -4974,17 +4997,93 @@ function TradingGame() {
     triggerToast(`Aset Diselamatkan ke Cold Wallet! Bonus +${formatMoney(bonus)}`, 'success');
   };
 
-  const handleClaimDailyAid = () => {
+  const handleClaimDailyStreak = (claimDay) => {
     const now = Date.now();
-    const cooldownMs = 24 * 60 * 60 * 1000;
-    if (now - lastDailyClaim < cooldownMs) {
-      triggerToast('Bantuan dana harian sudah diklaim hari ini. Silakan coba lagi besok!', 'warning');
+    const status = evaluateStreakStatus(dailyStreak, now);
+    if (!status.canClaim) {
+      triggerToast('Hadiah harian sudah diklaim hari ini. Silakan coba lagi besok!', 'warning');
       return;
     }
-    setCash((c) => c + 5.00);
+
+    const targetDay = status.currentDay;
+    const todayStr = getLocalDateString(now);
+
+    let rewardDesc = '';
+    if (targetDay === 1) {
+      setCash((c) => c + 5.00);
+      addCashLog({
+        type: 'STREAK_REWARD',
+        title: 'Daily Streak: Hari 1',
+        amount: 5.00,
+        detail: 'Modal Scalping Awal'
+      });
+      rewardDesc = '+$5.00 Modal Scalping Awal';
+    } else if (targetDay === 2) {
+      setInventory((prev) => ({ ...prev, insider_radar: (prev.insider_radar || 0) + 1 }));
+      rewardDesc = '1x Insider Alpha Radar';
+    } else if (targetDay === 3) {
+      setCash((c) => c + 70.00);
+      addCashLog({
+        type: 'STREAK_REWARD',
+        title: 'Daily Streak: Hari 3',
+        amount: 70.00,
+        detail: 'Working Capital'
+      });
+      rewardDesc = '+$70.00 Modal Tambahan';
+    } else if (targetDay === 4) {
+      setInventory((prev) => ({ ...prev, liq_shield: (prev.liq_shield || 0) + 1 }));
+      rewardDesc = '1x Liquidation Shield';
+    } else if (targetDay === 5) {
+      setActiveEffects((prev) => ({
+        ...prev,
+        zeroFeeUntil: Math.max(Date.now(), prev.zeroFeeUntil || 0) + 30 * 60 * 1000
+      }));
+      rewardDesc = 'Zero Fee Pass (30 Menit Aktif)';
+    } else if (targetDay === 6) {
+      setInventory((prev) => ({ ...prev, pump_whistle: (prev.pump_whistle || 0) + 1 }));
+      rewardDesc = '1x Whale Pump Whistle';
+    } else if (targetDay === 7) {
+      setInventory((prev) => ({ ...prev, leverage_250x: (prev.leverage_250x || 0) + 1 }));
+      setWhaleTokens((w) => w + 1);
+      rewardDesc = '1x Tiket 250x + 1 $WHALE + Badge Disciplined Degen';
+    }
+
+    const newStreakCount = status.isMissed ? 1 : (dailyStreak.streakCount || 0) + 1;
+    const nextCurrentDay = (newStreakCount % 7) === 0 ? 7 : (newStreakCount % 7);
+
+    setDailyStreak({
+      streakCount: newStreakCount,
+      currentDay: nextCurrentDay,
+      lastClaimDate: todayStr,
+      lastClaimTime: now,
+      freezeUsed: false,
+      badgeUnlocked: dailyStreak.badgeUnlocked || (targetDay === 7)
+    });
+
     setLastDailyClaim(now);
     playProfitSound();
-    triggerToast('Sukses klaim Bantuan Dana Harian +$5.00!', 'success');
+    triggerToast(`🔥 Sukses Klaim Streak Hari ke-${targetDay}: ${rewardDesc}!`, 'success');
+  };
+
+  const handleRescueDailyStreak = () => {
+    if (whaleTokens < 3) {
+      triggerToast('Dibutuhkan 3 $WHALE untuk menyelamatkan streak.', 'warning');
+      return;
+    }
+    const now = Date.now();
+    const yesterdayStr = getYesterdayDateString(now);
+    setWhaleTokens((w) => w - 3);
+    setDailyStreak((prev) => ({
+      ...prev,
+      lastClaimDate: yesterdayStr,
+      freezeUsed: true
+    }));
+    playProfitSound();
+    triggerToast('🛡️ Streak Berhasil Terselamatkan! Anda bisa langsung mengklaim hadiah hari ini.', 'success');
+  };
+
+  const handleClaimDailyAid = () => {
+    handleClaimDailyStreak(dailyStreak.currentDay || 1);
   };
 
   const WHALE_FAUCET_COOLDOWN_MS = 180 * 1000; // 3 menit
@@ -5540,6 +5639,14 @@ function TradingGame() {
     setTradeHistory([]);
     setCashLogs([]);
     setLastDailyClaim(0);
+    setDailyStreak({
+      streakCount: 0,
+      currentDay: 1,
+      lastClaimDate: null,
+      lastClaimTime: 0,
+      freezeUsed: false,
+      badgeUnlocked: false
+    });
     setLastCashAdClaim(0);
     setBullRunLeft(0);
     setBearMarketLeft(0);
@@ -5694,6 +5801,20 @@ function TradingGame() {
                 <span className="hidden sm:inline">{language === 'en' ? 'Sign In' : 'Masuk Akun'}</span>
               </a>
             )}
+
+            {/* Daily Streak Flame Widget */}
+            <button
+              data-testid="btn-daily-streak"
+              onClick={() => setShowDailyStreakModal(true)}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/15 to-orange-500/15 hover:from-amber-500/25 hover:to-orange-500/25 text-amber-400 border border-amber-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Daily Login Streak (Klik untuk buka kalender hadiah 7 hari)"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span className="font-mono text-xs">{dailyStreak.streakCount || 0}d</span>
+              {evaluateStreakStatus(dailyStreak).canClaim && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              )}
+            </button>
 
             <button
               aria-label={isMuted ? (language === 'en' ? 'Unmute Sound' : 'Aktifkan Suara Game') : (language === 'en' ? 'Mute Sound' : 'Matikan Suara Game')}
@@ -6276,39 +6397,57 @@ function TradingGame() {
               <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400 pt-1 flex-wrap">
                 <span>{t.upkeepFee || 'Upkeep Fee:'} <strong className="text-amber-400">{((currentLocation.upkeepRate || 0) * 100).toFixed(0)}%</strong></span>
                 <span>{t.rankLabel || 'Rank:'} <strong className={currentLocation.accent}>{(t.locations?.[currentLocation.level]?.badge) || currentLocation.badge}</strong></span>
+                {dailyStreak?.badgeUnlocked && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
+                    <span>👑 Disciplined Degen</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           <div className={`flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 pt-2 border-t border-white/10 ${isDailyClaimed ? 'py-1 sm:py-2 opacity-80' : ''}`}>
             <div className="text-xs text-slate-300 flex items-center gap-2">
-              <Gift className={`w-4 h-4 shrink-0 ${isDailyClaimed ? 'text-slate-500' : 'text-amber-400'}`} />
+              <Flame className={`w-4 h-4 shrink-0 ${isDailyClaimed ? 'text-slate-500' : 'text-amber-400 animate-pulse'}`} />
               <span>
                 {isDailyClaimed ? (
-                  t.dailyAidClaimedMsg || 'Bantuan sosial sudah diklaim hari ini. Kembali lagi besok!'
+                  <span>🔥 Daily Streak Hari ke-{dailyStreak.currentDay || 1} sudah diklaim. Kembali lagi besok!</span>
                 ) : (
                   <>{t.dailyAidUnclaimedMsg || 'Klaim Bantuan Dana Sosial Harian sebesar'} <strong>$5.00</strong></>
                 )}
               </span>
             </div>
-            <button
-              disabled={isDailyClaimed}
-              onClick={handleClaimDailyAid}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-extrabold text-xs transition-all shrink-0 ${
-                isDailyClaimed
-                  ? 'hidden sm:flex bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed shadow-none'
-                  : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 cursor-pointer'
-              }`}
-            >
-              {isDailyClaimed ? (
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{t.dailyAidClaimedBtn || 'Sudah Diklaim Hari Ini'}</span>
-                </span>
-              ) : (
-                t.dailyAidClaimBtn || 'Klaim Bantuan $5.00'
-              )}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowDailyStreakModal(true)}
+                className="px-2.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                title="Buka Kalender 7 Hari"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span>Kalender Streak ({dailyStreak.streakCount || 0}d)</span>
+              </button>
+
+              <button
+                data-testid="btn-claim-daily-aid"
+                disabled={isDailyClaimed}
+                onClick={handleClaimDailyAid}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-extrabold text-xs transition-all shrink-0 ${
+                  isDailyClaimed
+                    ? 'hidden sm:flex bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed shadow-none'
+                    : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 cursor-pointer'
+                }`}
+              >
+                {isDailyClaimed ? (
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{t.dailyAidClaimedBtn || 'Sudah Diklaim Hari Ini'}</span>
+                  </span>
+                ) : (
+                  t.dailyAidClaimBtn || 'Klaim Bantuan $5.00'
+                )}
+              </button>
+            </div>
           </div>
 
           {whaleTokens >= 1 && (
@@ -9380,6 +9519,18 @@ function TradingGame() {
           </div>
         </div>
       )}
+
+      {/* Daily Login Streak Calendar Modal */}
+      <DailyStreakModal
+        isOpen={showDailyStreakModal}
+        onClose={() => setShowDailyStreakModal(false)}
+        streakState={dailyStreak}
+        onClaim={handleClaimDailyStreak}
+        onRescueStreak={handleRescueDailyStreak}
+        whaleTokens={whaleTokens}
+        currentUser={currentUser}
+        language={language}
+      />
 
       {/* Game Credits & Developer Modal */}
       <CreditsModal
