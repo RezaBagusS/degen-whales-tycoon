@@ -5045,15 +5045,8 @@ function TradingGame() {
       return;
     }
 
-    const bracket = BINANCE_LEVERAGE_BRACKETS[leverage] || BINANCE_LEVERAGE_BRACKETS[10];
-    const orderNotional = rawMargin * leverage;
-    if (orderNotional > bracket.maxNotional) {
-      triggerToast(
-        `${t.maxBracketExceeded || 'Ukuran posisi melebihi batas Tier Bracket Binance untuk leverage ini!'} (${bracket.label})`,
-        'warning'
-      );
-      return;
-    }
+    const maxAllowedLev = (activeEffects.has250xTicket || leverage === 250) ? 250 : 100;
+    const finalLeverage = Math.max(1, Math.min(maxAllowedLev, Math.round(Number(leverage) || 1)));
 
     const parsedTp = tpInput.trim() ? Number(tpInput) : null;
     const parsedSl = slInput.trim() ? Number(slInput) : null;
@@ -5063,7 +5056,7 @@ function TradingGame() {
       return;
     }
 
-    const liqRatio = 0.92 / leverage;
+    const liqRatio = 0.92 / finalLeverage;
     const liqPrice =
       type === 'LONG' ? currentPrice * (1 - liqRatio) : currentPrice * (1 + liqRatio);
 
@@ -5101,7 +5094,7 @@ function TradingGame() {
       id: makeId(),
       type,
       margin: effectiveMargin,
-      leverage,
+      leverage: finalLeverage,
       entryPrice: currentPrice,
       liqPrice,
       tpPrice: !isNaN(parsedTp) && parsedTp > 0 ? parsedTp : null,
@@ -5113,7 +5106,7 @@ function TradingGame() {
     setActivePositions((prev) => [...prev, newPos]);
 
     // If 250x God Leverage was used, consume the ticket
-    if (leverage === 250) {
+    if (finalLeverage === 250) {
       setActiveEffects((prev) => ({ ...prev, has250xTicket: false }));
       setLeverage(100);
     }
@@ -7177,54 +7170,93 @@ function TradingGame() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
-                    <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
-                      <span>{t.marginCapital || 'MODAL MARGIN'} ({betPercent}%)</span>
-                      <span className="font-mono text-white font-bold">
+                  {/* 1. Modal Margin: Slider from 0% - 100% */}
+                  <div className="bg-[#0B0E14] p-2.5 sm:p-3 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                      <span className="font-semibold tracking-wide flex items-center gap-1.5">
+                        <span>{t.marginCapital || 'MODAL MARGIN'}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-400 font-mono font-bold text-[10px] border border-sky-500/30">
+                          {betPercent}%
+                        </span>
+                      </span>
+                      <span className="font-mono text-white font-bold text-xs sm:text-sm">
                         {formatMoney(cash * (betPercent / 100))}
                       </span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[10, 25, 50, 100].map((pct) => (
+
+                    {/* Smooth 0% - 100% Range Slider */}
+                    <div className="relative py-1 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={betPercent}
+                        onChange={(e) => setBetPercent(Number(e.target.value))}
+                        aria-label="Modal Margin Percentage Slider"
+                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-sky-400 focus:outline-none"
+                        style={{
+                          background: `linear-gradient(to right, #38BDF8 0%, #38BDF8 ${betPercent}%, #1E293B ${betPercent}%, #1E293B 100%)`
+                        }}
+                      />
+                    </div>
+
+                    {/* Quick percentage snap labels */}
+                    <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5 select-none">
+                      {[0, 25, 50, 75, 100].map((snap) => (
                         <button
-                          key={pct}
-                          onClick={() => setBetPercent(pct)}
-                          className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                            betPercent === pct
-                              ? 'bg-sky-500 text-slate-950'
-                              : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
+                          key={snap}
+                          type="button"
+                          onClick={() => setBetPercent(snap)}
+                          className={`transition-colors cursor-pointer hover:text-sky-300 ${
+                            betPercent === snap ? 'text-sky-400 font-bold' : ''
                           }`}
                         >
-                          {pct}%
+                          {snap}%
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80">
+                  {/* 2. Leverage: User Custom Input (1x - 100x / 250x) + Quick Buttons (Tier limits removed) */}
+                  <div className="bg-[#0B0E14] p-2.5 sm:p-3 rounded-xl border border-slate-800/80 flex flex-col justify-between">
                     <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <span>{t.leverage || 'LEVERAGE'}</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700/60" title="Binance Margin Tier Bracket">
-                          {BINANCE_LEVERAGE_BRACKETS[leverage]?.label}
-                        </span>
-                      </div>
-                      <span
-                        className={`font-mono font-bold ${
-                          leverage >= 250
-                            ? 'text-amber-400 animate-pulse'
-                            : leverage >= 50
-                            ? 'text-[#FF3366]'
-                            : 'text-amber-400'
-                        }`}
-                      >
-                        {leverage}x {leverage === 250 ? '⚡ GOD' : leverage === 100 ? '🔥 DEGEN' : ''}
+                      <span className="font-semibold tracking-wide">
+                        {t.leverage || 'LEVERAGE'}
                       </span>
+                      
+                      {/* Interactive User Input Field for Custom Leverage (Min 1x, Max 100x or 250x) */}
+                      <div className="flex items-center gap-1 bg-[#121824] border border-slate-700 focus-within:border-amber-400 rounded-lg px-2 py-0.5 shadow-inner">
+                        <input
+                          type="number"
+                          min={1}
+                          max={activeEffects.has250xTicket || leverage === 250 ? 250 : 100}
+                          value={leverage}
+                          onChange={(e) => {
+                            const maxLev = activeEffects.has250xTicket || leverage === 250 ? 250 : 100;
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            if (val === '') {
+                              setLeverage(1);
+                            } else if (!isNaN(val)) {
+                              if (val > maxLev) setLeverage(maxLev);
+                              else if (val < 1) setLeverage(1);
+                              else setLeverage(Math.floor(val));
+                            }
+                          }}
+                          aria-label="Leverage Input"
+                          className="w-12 bg-transparent text-right font-mono font-bold text-amber-400 text-xs sm:text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="font-mono font-bold text-amber-400 text-xs">x</span>
+                        {leverage === 250 && <span className="text-[10px]" title="250x God Mode">⚡</span>}
+                      </div>
                     </div>
+
+                    {/* Quick Preset Buttons */}
                     <div className={`grid ${activeEffects.has250xTicket || leverage === 250 ? 'grid-cols-5' : 'grid-cols-4'} gap-1.5`}>
                       {[2, 10, 50, 100, ...(activeEffects.has250xTicket || leverage === 250 ? [250] : [])].map((lev) => (
                         <button
                           key={lev}
+                          type="button"
                           onClick={() => setLeverage(lev)}
                           className={`py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                             leverage === lev
