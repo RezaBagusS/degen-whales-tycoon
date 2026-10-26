@@ -2247,6 +2247,9 @@ function TradingGame() {
     });
   }, []);
 
+  // Mobile Workstation Diorama Collapsible State (Compact HUD on mobile by default to prioritize trading terminal)
+  const [isMobileWorkstationOpen, setIsMobileWorkstationOpen] = useState(false);
+
   // TradingView-Style Drawing Tools State
   const [activeDrawingTool, setActiveDrawingTool] = useState(null); // 'trendline' | 'horizontal' | 'box' | 'freehand' | null
   const [showDrawingTools, setShowDrawingTools] = useState(false);
@@ -4309,13 +4312,51 @@ function TradingGame() {
     ctx.lineTo(chartWidth, chartHeight);
     ctx.stroke();
 
-    // Grid labels harga sumbu kanan
+    // Precompute occupied vertical zones on the right axis to avoid overlapping/colliding labels
+    const occupiedAxisZones = [];
+    if (markY >= 10 && markY <= chartHeight - 14) {
+      occupiedAxisZones.push({ top: markY - 14, bottom: markY + 14 });
+      const currentTf = TIMEFRAMES[selectedTfIdx] || TIMEFRAMES[0];
+      const tfMs = currentTf.seconds * 1000;
+      const nowMs = Date.now();
+      const candleCloseTime = Math.floor(nowMs / tfMs) * tfMs + tfMs;
+      const countdownY = (markY + 11 + 15 <= chartHeight - 14) ? markY + 11 : markY - 26;
+      if (countdownY >= 6 && countdownY <= chartHeight - 14) {
+        occupiedAxisZones.push({ top: countdownY - 5, bottom: countdownY + 19 });
+      }
+    }
+
+    if (curPairPositions.length > 0) {
+      curPairPositions.forEach((pos) => {
+        [pos.entryPrice, pos.liqPrice, pos.tpPrice, pos.slPrice].forEach((p) => {
+          if (!p || isNaN(p)) return;
+          const py = toY(p);
+          if (py >= 12 && py <= chartHeight - 14) {
+            occupiedAxisZones.push({ top: py - 11, bottom: py + 11 });
+          }
+        });
+      });
+    }
+
+    currentPairDrawings.forEach((d) => {
+      if (d.type === 'horizontal') {
+        const py = toY(d.price);
+        if (py >= 10 && py <= chartHeight - 14) {
+          occupiedAxisZones.push({ top: py - 11, bottom: py + 11 });
+        }
+      }
+    });
+
+    // Grid labels harga sumbu kanan (Skip if colliding with price pills or countdown)
     ctx.fillStyle = '#64748B';
     ctx.font = dynamicPrecision >= 5 ? '9px monospace' : (dynamicPrecision === 4 ? '9.5px monospace' : '10px monospace');
     for (let i = 0; i <= 6; i++) {
       const y = 15 + ((chartHeight - 30) / 6) * i;
-      const pVal = maxPrice - (i / 6) * priceRange;
-      ctx.fillText(formatPairPrice(pVal, dynamicPrecision), chartWidth + 7, y + 4);
+      const isColliding = occupiedAxisZones.some((zone) => y >= zone.top && y <= zone.bottom);
+      if (!isColliding) {
+        const pVal = maxPrice - (i / 6) * priceRange;
+        ctx.fillText(formatPairPrice(pVal, dynamicPrecision), chartWidth + 7, y + 4);
+      }
     }
 
     // Price Pills for Horizontal Drawings (Only within visible price axis, never covering AUTO button or Time Axis)
@@ -5983,27 +6024,40 @@ function TradingGame() {
               const nextLocT = nextLocation ? (t.locations?.[nextLocation.level] || {}) : null;
               return (
                 <>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-white/10 text-white font-mono text-[10px] font-bold">
-                        WORKSTATION LV.{currentLocation.level}
-                      </span>
-                      <span className={`text-xs font-bold ${currentLocation.accent}`}>
-                        {curLocT.badge || currentLocation.badge}
-                      </span>
+                  <div className="flex items-start justify-between w-full sm:w-auto">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-white/10 text-white font-mono text-[10px] font-bold">
+                          WORKSTATION LV.{currentLocation.level}
+                        </span>
+                        <span className={`text-xs font-bold ${currentLocation.accent}`}>
+                          {curLocT.badge || currentLocation.badge}
+                        </span>
+                      </div>
+                      <h2 className="text-base sm:text-2xl font-extrabold text-white mt-0.5">
+                        {curLocT.name || currentLocation.name}
+                      </h2>
+                      <p className="text-[11px] sm:text-xs text-slate-300 hidden sm:block">{curLocT.sub || currentLocation.sub}</p>
                     </div>
-                    <h2 className="text-lg sm:text-2xl font-extrabold text-white mt-0.5">
-                      {curLocT.name || currentLocation.name}
-                    </h2>
-                    <p className="text-xs text-slate-300">{curLocT.sub || currentLocation.sub}</p>
+
+                    {/* Mobile 3D Diorama Expand/Collapse Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileWorkstationOpen((prev) => !prev)}
+                      className="sm:hidden px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 font-mono text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shrink-0 ml-2"
+                      title={isMobileWorkstationOpen ? 'Tutup Maket 3D' : 'Buka Maket 3D'}
+                    >
+                      <span>{isMobileWorkstationOpen ? 'Tutup 3D' : 'Maket 3D'}</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isMobileWorkstationOpen ? 'rotate-180' : ''}`} />
+                    </button>
                   </div>
 
                   {nextLocation ? (
-                    <div className="bg-slate-950/60 border border-slate-800 px-4 py-2.5 rounded-xl text-right w-full sm:w-auto">
-                      <div className="text-[10px] text-slate-400 uppercase">
+                    <div className="bg-slate-950/60 border border-slate-800 px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-xl text-right w-full sm:w-auto">
+                      <div className="text-[9px] sm:text-[10px] text-slate-400 uppercase">
                         {t.targetNext || 'Target Next:'} <span className="text-white font-bold">{nextLocT?.name || nextLocation.name}</span>
                       </div>
-                      <div className="w-full sm:w-56 h-2 bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                      <div className="w-full sm:w-56 h-1.5 sm:h-2 bg-slate-800 rounded-full overflow-hidden mt-1">
                         <div
                           className="h-full bg-gradient-to-r from-[#00FF88] to-sky-400 transition-all duration-300"
                           style={{
@@ -6011,7 +6065,7 @@ function TradingGame() {
                           }}
                         />
                       </div>
-                      <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-300 mt-1">
+                      <div className="flex items-center justify-between gap-2 text-[9px] sm:text-[10px] font-mono text-slate-300 mt-0.5">
                         <span>{formatMoney(peakNetWorth)}</span>
                         <span>{formatMoney(nextLocation.reqNetWorth)}</span>
                       </div>
@@ -6026,7 +6080,58 @@ function TradingGame() {
             })()}
           </div>
 
-          <div className="relative bg-[#05070A]/90 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-4 sm:gap-6 overflow-hidden shadow-xl">
+          {/* Quick Financial Stats Bar (Always visible in clean 3 columns) */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 bg-[#0B0E14]/90 p-2.5 sm:p-3 rounded-xl border border-white/10 shadow-inner">
+            <div className="min-w-0">
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-semibold truncate">
+                {t.availableCash || 'Available Cash'}
+              </div>
+              <div data-testid="cash" className="text-base sm:text-2xl font-mono font-bold text-[#00FF88] tracking-tight truncate">
+                {formatMoney(cash)}
+              </div>
+            </div>
+
+            <div className="border-l border-slate-800 pl-2 sm:pl-3 min-w-0">
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1 truncate">
+                {t.netDps || 'Net DPS'}
+                {activeBoostMultiplier !== 1 && (
+                  <span
+                    className={`text-[8px] sm:text-[10px] px-1 rounded animate-pulse ${
+                      activeBoostMultiplier > 1
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-rose-500/20 text-rose-400'
+                    }`}
+                  >
+                    {activeBoostMultiplier.toFixed(2)}x
+                  </span>
+                )}
+              </div>
+              <div data-testid="dps" className="text-xs sm:text-base font-mono font-semibold text-sky-400 truncate">
+                +{formatMoney(currentDps)}/s
+              </div>
+              {whaleDividend > 0 && (
+                <div className="text-[8px] sm:text-[10px] font-mono text-cyan-300 font-bold hidden sm:block truncate">
+                  +{formatMoney(whaleDividend)}/s Dividen Whale ({whaleTokens} 🐋)
+                </div>
+              )}
+              {upkeepDrain > 0 && (
+                <div className="text-[8px] sm:text-[9px] font-mono text-rose-400 hidden sm:block truncate">
+                  {t.upkeepTax || 'Pajak/Beban:'} -{Math.round(currentLocation.upkeepRate * 100)}%
+                </div>
+              )}
+            </div>
+
+            <div className="border-l border-slate-800 pl-2 sm:pl-3 min-w-0">
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-semibold truncate">
+                {t.netWorth || 'Net Worth'}
+              </div>
+              <div className="text-xs sm:text-base font-mono font-semibold text-amber-400 truncate">
+                {formatMoney(netWorth)}
+              </div>
+            </div>
+          </div>
+
+          <div className={`relative bg-[#05070A]/90 border border-white/10 rounded-2xl p-3 sm:p-4 flex-col md:flex-row items-center gap-4 sm:gap-6 overflow-hidden shadow-xl ${isMobileWorkstationOpen ? 'flex' : 'hidden sm:flex'}`}>
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
             
             {/* 3D Architectural Diorama Showcase (Turntable Physical Model, NOT Flat Card) */}
@@ -6169,57 +6274,6 @@ function TradingGame() {
                 </button>
               </div>
 
-              {/* Financial Stats Bar (Moved to Diorama Section) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#0B0E14]/90 p-3 rounded-xl border border-white/10 shadow-inner">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                    {t.availableCash || 'Available Cash'}
-                  </div>
-                  <div data-testid="cash" className="text-lg sm:text-2xl font-mono font-bold text-[#00FF88] tracking-tight">
-                    {formatMoney(cash)}
-                  </div>
-                </div>
-
-                <div className="border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1">
-                    {t.netDps || 'Net DPS'}
-                    {activeBoostMultiplier !== 1 && (
-                      <span
-                        className={`text-[10px] px-1 rounded animate-pulse ${
-                          activeBoostMultiplier > 1
-                            ? 'bg-amber-500/20 text-amber-300'
-                            : 'bg-rose-500/20 text-rose-400'
-                        }`}
-                      >
-                        {activeBoostMultiplier.toFixed(2)}x
-                      </span>
-                    )}
-                  </div>
-                  <div data-testid="dps" className="text-sm sm:text-base font-mono font-semibold text-sky-400">
-                    +{formatMoney(currentDps)}/s
-                  </div>
-                  {whaleDividend > 0 && (
-                    <div className="text-[10px] font-mono text-cyan-300 font-bold">
-                      +{formatMoney(whaleDividend)}/s Dividen Whale ({whaleTokens} 🐋)
-                    </div>
-                  )}
-                  {upkeepDrain > 0 && (
-                    <div className="text-[9px] font-mono text-rose-400">
-                      {t.upkeepTax || 'Pajak/Beban:'} -{Math.round(currentLocation.upkeepRate * 100)}%
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                    {t.netWorth || 'Net Worth'}
-                  </div>
-                  <div className="text-sm sm:text-base font-mono font-semibold text-amber-400">
-                    {formatMoney(netWorth)}
-                  </div>
-                </div>
-              </div>
-
               <div className="text-sm font-bold text-white">
                 {t.generatesPassive || 'Menghasilkan'} <span className="text-[#00FF88] font-mono">{formatMoney(currentDps)}</span> {t.secPassively || '/ detik secara pasif'}
               </div>
@@ -6233,7 +6287,7 @@ function TradingGame() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/10">
+          <div className={`flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 pt-2 border-t border-white/10 ${isDailyClaimed ? 'py-1 sm:py-2 opacity-80' : ''}`}>
             <div className="text-xs text-slate-300 flex items-center gap-2">
               <Gift className={`w-4 h-4 shrink-0 ${isDailyClaimed ? 'text-slate-500' : 'text-amber-400'}`} />
               <span>
@@ -6247,9 +6301,9 @@ function TradingGame() {
             <button
               disabled={isDailyClaimed}
               onClick={handleClaimDailyAid}
-              className={`px-4 py-2 rounded-xl font-extrabold text-xs transition-all shrink-0 ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-extrabold text-xs transition-all shrink-0 ${
                 isDailyClaimed
-                  ? 'bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed shadow-none'
+                  ? 'hidden sm:flex bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed shadow-none'
                   : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 cursor-pointer'
               }`}
             >
@@ -6314,23 +6368,23 @@ function TradingGame() {
                 </div>
               )}
 
-              <div className="px-3.5 py-2.5 bg-[#111622] border-b border-slate-800 flex flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <div className="px-2.5 sm:px-3.5 py-1.5 sm:py-2.5 bg-[#111622] border-b border-slate-800 flex flex-col gap-1.5 sm:gap-2">
+              <div className="flex items-center justify-between gap-2">
                 {/* Binance-style Pair Dropdown Selector */}
                 <div className="relative" ref={pairDropdownRef}>
                   <button
                     type="button"
                     data-testid="pair-select-trigger"
                     onClick={() => setIsPairDropdownOpen((prev) => !prev)}
-                    className={`group flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 px-3 py-1.5 sm:py-2 rounded-xl border transition-all cursor-pointer select-none ${
+                    className={`group flex items-center justify-between sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border transition-all cursor-pointer select-none max-w-[190px] sm:max-w-none ${
                       isPairDropdownOpen
                         ? 'bg-[#151D2E] border-emerald-500/60 shadow-lg shadow-emerald-500/10'
                         : 'bg-[#0B0E14] hover:bg-[#141B2A] border-slate-800 hover:border-slate-700'
                     }`}
                     title={language === 'en' ? 'Select Trading Pair' : 'Pilih Pair / Pasangan Trading'}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-mono font-black text-[11px] shrink-0 border ${
+                    <div className="flex items-center gap-1.5 sm:gap-2.5">
+                      <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-mono font-black text-[10px] sm:text-[11px] shrink-0 border ${
                         MARKET_PAIRS[selectedPairIdx]?.marketType === 'crypto_real'
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-[#00FF88]'
                           : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
@@ -6338,7 +6392,7 @@ function TradingGame() {
                         {(MARKET_PAIRS[selectedPairIdx]?.symbol || 'BTC').split('/')[0].slice(0, 3)}
                       </div>
                       <div className="text-left">
-                        <div className="flex items-center gap-1.5 leading-none">
+                        <div className="flex items-center gap-1 sm:gap-1.5 leading-none">
                           <span className="font-mono font-bold text-xs sm:text-sm text-white tracking-wide group-hover:text-[#00FF88] transition-colors">
                             {MARKET_PAIRS[selectedPairIdx]?.symbol}
                           </span>
@@ -6348,30 +6402,33 @@ function TradingGame() {
                             }`}
                           />
                         </div>
-                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-sans leading-none block mt-1">
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-sans leading-none hidden sm:block mt-1">
                           {MARKET_PAIRS[selectedPairIdx]?.name}
                         </span>
                       </div>
                     </div>
 
                     {/* Market Type Badge */}
-                    <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                    <div className="flex items-center gap-1 shrink-0 ml-1">
                       {MARKET_PAIRS[selectedPairIdx]?.marketType === 'crypto_real' ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[#00FF88] font-mono text-[9px] font-bold flex items-center gap-1.5" title="Pasar Real Crypto - Kebal Manipulasi">
+                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[#00FF88] font-mono text-[8.5px] sm:text-[9px] font-bold flex items-center gap-1" title="Pasar Real Crypto - Kebal Manipulasi">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>LIVE CRYPTO</span>
+                          <span className="hidden sm:inline">LIVE CRYPTO</span>
+                          <span className="sm:hidden">LIVE</span>
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 font-mono text-[9px] font-bold flex items-center gap-1.5" title="Pasar Degen Perps - Bisa Dimanipulasi">
+                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 font-mono text-[8.5px] sm:text-[9px] font-bold flex items-center gap-1" title="Pasar Degen Perps - Bisa Dimanipulasi">
                           <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                          <span>DEGEN PERPS</span>
+                          <span className="hidden sm:inline">DEGEN PERPS</span>
+                          <span className="sm:hidden">DEGEN</span>
                         </span>
                       )}
 
                       {activePosition?.pairSymbol === MARKET_PAIRS[selectedPairIdx]?.symbol && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono text-[9px] font-bold flex items-center gap-1 animate-pulse">
+                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono text-[8.5px] sm:text-[9px] font-bold flex items-center gap-1 animate-pulse">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          <span>{t.badgePosition || 'POSISI'}</span>
+                          <span className="hidden sm:inline">{t.badgePosition || 'POSISI'}</span>
+                          <span className="sm:hidden">POS</span>
                         </span>
                       )}
                     </div>
@@ -6564,7 +6621,7 @@ function TradingGame() {
                   <button
                     type="button"
                     onClick={() => setIsSidebarOpen((prev) => !prev)}
-                    className={`relative p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                    className={`relative p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                       isSidebarOpen
                         ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700/80 text-slate-300'
                         : 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-500/10'
@@ -6590,7 +6647,7 @@ function TradingGame() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-1.5 bg-[#0B0E14] p-1 sm:p-1.5 rounded-lg border border-slate-800 overflow-x-auto">
+              <div className="flex items-center justify-between gap-1.5 bg-[#0B0E14] px-1.5 py-1 sm:p-1.5 rounded-lg border border-slate-800 overflow-x-auto">
                 {/* Mobile View: Dropdown Timeframe (User Request #2) */}
                 <div className="flex sm:hidden items-center gap-1.5 shrink-0 px-1 py-0.5">
                   <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -6674,7 +6731,7 @@ function TradingGame() {
               </div>
 
               {/* Technical Indicators Interactive Sub-bar (Tanpa Display Angka Harga) */}
-              <div className="flex items-center justify-between gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#090D15] border-t border-slate-800/80 text-[10px] font-mono select-none overflow-x-auto scrollbar-none">
+              <div className="flex items-center justify-between gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-[#090D15] border-t border-slate-800/80 text-[10px] font-mono select-none overflow-x-auto scrollbar-none">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <div className="flex items-center gap-1 text-slate-400 font-semibold mr-1 shrink-0">
                     <Activity className="w-3 h-3 text-sky-400" />
@@ -7047,7 +7104,7 @@ function TradingGame() {
                 </button>
               )}
               <div className="absolute top-2 left-11 sm:left-14 max-w-[calc(100%-80px)] flex flex-wrap items-center gap-1.5 pointer-events-none z-10">
-                <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-900/85 border border-slate-700 text-[9px] sm:text-[10px] font-mono text-sky-400 font-bold">
+                <span className="hidden sm:inline-block shrink-0 px-1.5 py-0.5 rounded bg-slate-900/85 border border-slate-700 text-[9px] sm:text-[10px] font-mono text-sky-400 font-bold">
                   TF: {TIMEFRAMES[selectedTfIdx].label}
                 </span>
                 {displayCandle && (
