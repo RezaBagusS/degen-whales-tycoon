@@ -254,6 +254,13 @@ export async function GET(request) {
         });
       }
 
+      const questStats = save?.savePayload?.questStats || save?.questStats || {};
+      const lifetimeTrades = Math.max(
+        Number(questStats.totalTradesClosed || 0),
+        Number(questStats.totalTradesOpened || 0),
+        history.length
+      );
+
       return {
         id: u.id,
         username: u.username,
@@ -269,7 +276,7 @@ export async function GET(request) {
         peakNetWorth: save?.peakNetWorth || 0,
         whaleTokens: save?.whaleTokens || 0,
         currentLocationLevel: save?.currentLocationLevel || 1,
-        tradeCount: history.length,
+        tradeCount: lifetimeTrades,
         activePositionsCount: positions.length,
         syndicateTag: u.syndicate?.tag || null,
         inventory: save?.inventory || {}

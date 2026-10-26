@@ -1106,7 +1106,7 @@ function loadGame() {
       lastCashAdClaim: finiteNonnegative(saved.lastCashAdClaim, 0),
       tradeHistory: Array.isArray(saved.tradeHistory) ? saved.tradeHistory
         .filter(t => t && typeof t.pair === 'string' && Number.isFinite(t.pnl)
-          && Number.isFinite(t.roi)).slice(0, 20) : [],
+          && Number.isFinite(t.roi)).slice(0, 50) : [],
       launchpadHistory: Array.isArray(saved.launchpadHistory) ? saved.launchpadHistory.slice(0, 50) : [],
       selectedPairIdx: pairIdx,
       selectedTfIdx: Number.isInteger(saved.selectedTfIdx) && TIMEFRAMES[saved.selectedTfIdx]
@@ -3276,7 +3276,7 @@ function TradingGame() {
         version: 8,
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
-        tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        tradeHistory: (state.tradeHistory || []).slice(0, 50),
         launchpadHistory: (state.launchpadHistory || []).slice(0, 50),
         cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
@@ -3326,7 +3326,7 @@ function TradingGame() {
         version: 8,
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
-        tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        tradeHistory: (state.tradeHistory || []).slice(0, 50),
         launchpadHistory: (state.launchpadHistory || []).slice(0, 50),
         cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
@@ -4622,7 +4622,7 @@ function TradingGame() {
           roi: roiPercent,
           status: pnlAmount >= 0 ? 'PROFIT' : 'LOSS'
         },
-        ...prev.slice(0, 19)
+        ...prev.slice(0, 49)
       ]);
 
       addCashLog({
@@ -4711,7 +4711,7 @@ function TradingGame() {
       triggerToast(`Semua posisi ditutup! Net Total PnL: ${formatMoney(netTotalPnl)}`, 'warning');
     }
 
-    setTradeHistory((prev) => [...newHistoryEntries, ...prev].slice(0, 20));
+    setTradeHistory((prev) => [...newHistoryEntries, ...prev].slice(0, 50));
     setCashLogs((prev) => [...newCashLogs, ...prev].slice(0, 50));
     setQuestStats((prev) => ({
       ...prev,
