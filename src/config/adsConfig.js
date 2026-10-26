@@ -28,13 +28,14 @@ export const ADS_CONFIG = {
     sponsorTagline: 'Mitra Likuiditas Global Mendanai Ekosistem Trading & Pertumbuhan Trader'
   },
 
-  // Konfigurasi Monetag (resmi terhubung dengan direct link & onclick popunder)
+  // Konfigurasi Monetag (resmi terhubung dengan direct link rewarded)
   monetag: {
     directLinkUrl: 'https://uplcm.com/4/12106307',
     directLinkZoneId: '12106307',
-    onClickZoneId: '12121486',
-    onClickScriptUrl: 'https://al5sm.com/tag.min.js',
-    onClickIntervalHours: 6 // Frekuensi iklan OnClick per pemain (setiap 6 jam)
+    enableOnClickPopunder: false, // Dinonaktifkan: Mencegah redirect agresif saat pemain menekan tombol apapun di mobile
+    onClickZoneId: '', // Kosongkan agar script popunder tidak mengintervensi touch event di mobile
+    onClickScriptUrl: '',
+    onClickIntervalHours: 24
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)

@@ -18,6 +18,10 @@ export default function MonetagOnClick() {
       return;
     }
 
+    if (!ADS_CONFIG.monetag?.enableOnClickPopunder) {
+      return;
+    }
+
     const zoneId = ADS_CONFIG.monetag?.onClickZoneId;
     if (!zoneId) {
       return;

@@ -2249,6 +2249,7 @@ function TradingGame() {
 
   // TradingView-Style Drawing Tools State
   const [activeDrawingTool, setActiveDrawingTool] = useState(null); // 'trendline' | 'horizontal' | 'box' | 'freehand' | null
+  const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [drawingColor, setDrawingColor] = useState(DRAWING_COLORS[0]);
   const [pendingDrawing, setPendingDrawing] = useState(null);
   const [selectedDrawingId, setSelectedDrawingId] = useState(null);
@@ -5547,10 +5548,10 @@ function TradingGame() {
 
   return (
     <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans select-none overflow-x-hidden">
-      <header className="sticky top-0 z-30 bg-[#0B0E14]/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg shadow-[#00FF88]/20 border border-emerald-500/40 bg-slate-900 shrink-0">
+      <header className="sticky top-0 z-30 bg-[#0B0E14]/95 backdrop-blur-md border-b border-slate-800/80 px-2 sm:px-6 py-2 sm:py-2.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg shadow-[#00FF88]/20 border border-emerald-500/40 bg-slate-900 shrink-0">
               <img
                 src="/logo.png"
                 alt="Degen & Whale Logo"
@@ -5558,27 +5559,27 @@ function TradingGame() {
               />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-extrabold tracking-tight text-sm sm:text-base text-white">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="font-extrabold tracking-tight text-xs sm:text-base text-white">
                   DEGEN <span className="text-[#00FF88]">&amp;</span> WHALE
                 </h1>
-                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/30">
+                <span className="text-[9px] sm:text-[10px] font-mono uppercase px-1 sm:px-1.5 py-0.5 rounded bg-emerald-500/10 text-[#00FF88] border border-emerald-500/30">
                   {APP_DISPLAY_VERSION}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap sm:flex-nowrap justify-end shrink-0">
             <button
               onClick={() => setShowPrestigeModal(true)}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/20 to-yellow-500/10 hover:from-amber-500/30 hover:to-yellow-500/20 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
+              className="relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/20 to-yellow-500/10 hover:from-amber-500/30 hover:to-yellow-500/20 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
             >
               <Crown className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline">Whale:</span>
               <span className="font-mono">{whaleTokens}</span>
               {claimableWhaleTokens > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-amber-400 text-slate-950 rounded-full text-[10px] font-extrabold animate-bounce">
+                <span className="ml-0.5 sm:ml-1 px-1 sm:px-1.5 py-0.2 bg-amber-400 text-slate-950 rounded-full text-[9px] sm:text-[10px] font-extrabold animate-bounce">
                   +{claimableWhaleTokens}
                 </span>
               )}
@@ -5594,21 +5595,21 @@ function TradingGame() {
               }}
               className={
                 isCashAdCoolingDown
-                  ? "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-800/80 border border-slate-700/80 text-slate-400 cursor-not-allowed select-none"
-                  : "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/15 hover:from-emerald-500/30 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+                  ? "flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-800/80 border border-slate-700/80 text-slate-400 cursor-not-allowed select-none"
+                  : "flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/15 hover:from-emerald-500/30 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
               }
               title={isCashAdCoolingDown ? `Cooldown: Tunggu ${cashAdRemainingSec}s lagi` : "Tonton Iklan (+$5.00 Modal Kas Gratis)"}
             >
               {isCashAdCoolingDown ? (
                 <>
                   <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                  <span className="text-slate-300 font-mono font-bold">{formatCountdown(cashAdRemainingSec)}</span>
+                  <span className="text-slate-300 font-mono font-bold text-[11px] sm:text-xs">{formatCountdown(cashAdRemainingSec)}</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                   <span className="hidden sm:inline">Gratis:</span>
-                  <span className="font-mono text-emerald-200 font-bold">+$5 Cash</span>
+                  <span className="font-mono text-emerald-200 font-bold text-[11px] sm:text-xs">+$5 Cash</span>
                 </>
               )}
             </button>
@@ -5616,7 +5617,7 @@ function TradingGame() {
             <button
               data-testid="btn-share-pnl"
               onClick={() => setShowPnlModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#00FF88]/15 hover:bg-[#00FF88]/25 text-[#00FF88] border border-[#00FF88]/40 transition-all cursor-pointer"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-[#00FF88]/15 hover:bg-[#00FF88]/25 text-[#00FF88] border border-[#00FF88]/40 transition-all cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{t.sharePnl || 'Cetak PnL'}</span>
@@ -5628,7 +5629,7 @@ function TradingGame() {
               href={ADS_CONFIG.donation.saweriaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
               title="Traktir Developer via Saweria (QRIS, GoPay, Dana, OVO)"
             >
               <Heart className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30" />
@@ -5640,19 +5641,19 @@ function TradingGame() {
               <button
                 data-testid="btn-account-status"
                 onClick={() => { setConfirmReset(false); setShowSettingsModal(true); }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/50 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-mono font-bold bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/50 transition-all cursor-pointer shadow-sm active:scale-95"
                 title={`Akun: @${currentUser.username} (Tersinkron Cloud - Klik untuk pengaturan akun)`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <User className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="max-w-[70px] sm:max-w-[100px] truncate">@{currentUser.username}</span>
-                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="max-w-[60px] sm:max-w-[100px] truncate">@{currentUser.username}</span>
+                <Cloud className="w-3.5 h-3.5 text-emerald-400 hidden sm:inline" />
               </button>
             ) : (
               <a
                 data-testid="btn-auth-link"
                 href="/auth?mode=login"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-600/20 to-emerald-600/20 hover:from-cyan-600/30 hover:to-emerald-600/30 text-cyan-300 border border-cyan-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-600/20 to-emerald-600/20 hover:from-cyan-600/30 hover:to-emerald-600/30 text-cyan-300 border border-cyan-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Masuk / Daftar Akun untuk Simpan Progres Lintas Browser"
               >
                 <User className="w-3.5 h-3.5 text-cyan-400" />
@@ -5664,21 +5665,21 @@ function TradingGame() {
               aria-label={isMuted ? (language === 'en' ? 'Unmute Sound' : 'Aktifkan Suara Game') : (language === 'en' ? 'Mute Sound' : 'Matikan Suara Game')}
               title={isMuted ? (language === 'en' ? 'Sound: MUTED (Click to activate)' : 'Suara Game: MATI (Klik untuk aktifkan audio synth)') : (language === 'en' ? 'Sound: ON (Click to mute)' : 'Suara Game: NYALA (Klik untuk mute)')}
               onClick={handleToggleSound}
-              className={`p-2 rounded-lg border transition-all cursor-pointer ${
+              className={`p-1.5 sm:p-2 rounded-lg border transition-all cursor-pointer ${
                 isMuted
                   ? 'bg-slate-800/50 text-slate-500 border-slate-700/60 hover:text-slate-300'
                   : 'bg-emerald-500/15 text-[#00FF88] border-emerald-500/40 hover:bg-emerald-500/25 shadow-md shadow-[#00FF88]/10'
               }`}
             >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              {isMuted ? <VolumeX className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> : <Volume2 className="w-3.5 sm:w-4 h-3.5 sm:h-4" />}
             </button>
 
             <button
               aria-label={t.settings || 'Pengaturan'}
               onClick={() => { setConfirmReset(false); setShowSettingsModal(true); }}
-              className="p-2 rounded-lg bg-slate-800/70 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-lg bg-slate-800/70 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
             </button>
           </div>
         </div>
@@ -6030,7 +6031,7 @@ function TradingGame() {
               const currentArch = LOCATION_ARCHITECTURE_CONFIG[currentLocation.level] || LOCATION_ARCHITECTURE_CONFIG[1];
               return (
                 <div 
-                  className="relative w-full md:w-[380px] lg:w-[460px] h-72 sm:h-80 md:h-[340px] select-none rounded-2xl flex items-center justify-center p-3 sm:p-4 overflow-hidden bg-slate-950/80 border border-white/10 shrink-0 shadow-2xl"
+                  className="relative w-full md:w-[380px] lg:w-[460px] h-56 sm:h-72 md:h-[340px] select-none rounded-2xl flex items-center justify-center p-3 sm:p-4 overflow-hidden bg-slate-950/80 border border-white/10 shrink-0 shadow-2xl"
                   style={{ perspective: 1100 }}
                 >
                   {/* Subtle Background Ambience & Spotlight */}
@@ -6586,8 +6587,41 @@ function TradingGame() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-1 bg-[#0B0E14] p-1 rounded-lg border border-slate-800 overflow-x-auto">
-                <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center justify-between gap-1.5 bg-[#0B0E14] p-1 sm:p-1.5 rounded-lg border border-slate-800 overflow-x-auto">
+                {/* Mobile View: Dropdown Timeframe (User Request #2) */}
+                <div className="flex sm:hidden items-center gap-1.5 shrink-0 px-1 py-0.5">
+                  <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  <label htmlFor="mobile-timeframe-select" className="text-[10px] text-slate-400 font-mono font-bold">TF:</label>
+                  <select
+                    id="mobile-timeframe-select"
+                    data-testid="mobile-timeframe-select"
+                    aria-label="Timeframe"
+                    value={selectedTfIdx}
+                    onChange={(e) => {
+                      const idx = Number(e.target.value);
+                      setSelectedTfIdx(idx);
+                      const tfKey = `${selectedPairIdx}-${idx}`;
+                      if (!candlesticksByTfRef.current[tfKey]?.length) {
+                        const pair = MARKET_PAIRS[selectedPairIdx] || MARKET_PAIRS[0];
+                        const liveP = marketPricesRef.current[selectedPairIdx] ?? pair.basePrice;
+                        const syncMap = generateSynchronousCandlesForPair(selectedPairIdx, liveP);
+                        candlesticksByTfRef.current = { ...candlesticksByTfRef.current, ...syncMap };
+                        setCandlesticksByTf(prev => ({ ...prev, ...syncMap }));
+                      }
+                      setQuestStats((prev) => ({ ...prev, switchedPairOrTf: true }));
+                    }}
+                    className="bg-[#121824] text-sky-300 border border-slate-700/80 rounded px-2 py-1 text-xs font-mono font-bold focus:outline-none focus:border-sky-500 cursor-pointer shadow-sm"
+                  >
+                    {TIMEFRAMES.map((tf, idx) => (
+                      <option key={tf.label} value={idx} className="bg-[#0B0E14] text-slate-200">
+                        {tf.label} {tf.name ? `(${tf.name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Desktop/Tablet View: Pill Buttons */}
+                <div className="hidden sm:flex items-center gap-1 shrink-0">
                   <Clock className="w-3.5 h-3.5 text-slate-400 ml-1 mr-1 shrink-0" />
                   {TIMEFRAMES.map((tf, idx) => (
                     <button
@@ -6617,27 +6651,29 @@ function TradingGame() {
 
                 {currentMarketPair?.marketType === 'crypto_real' ? (
                   <div
-                    className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/50 text-[10px] text-emerald-300 font-mono shrink-0 select-none shadow-sm"
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/50 text-[10px] text-emerald-300 font-mono shrink-0 select-none shadow-sm"
                     title={language === 'en' ? 'Direct real-time price feed from Binance Global' : 'Data harga live real-time tersambung ke Binance Global'}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] animate-pulse" />
-                    <span className="font-bold">LIVE BINANCE FEED</span>
+                    <span className="font-bold hidden sm:inline">LIVE BINANCE FEED</span>
+                    <span className="font-bold sm:hidden">LIVE</span>
                   </div>
                 ) : (
                   <div
-                    className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/40 text-[10px] text-purple-300 font-mono shrink-0 select-none"
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/40 text-[10px] text-purple-300 font-mono shrink-0 select-none"
                     title={language === 'en' ? 'Degen Perps market with Whale manipulation enabled' : 'Simulasi Degen Perps dengan fitur manipulasi Whale'}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                    <span>Simulasi Degen Perps</span>
+                    <span className="hidden sm:inline">Simulasi Degen Perps</span>
+                    <span className="sm:hidden">DEGEN</span>
                   </div>
                 )}
               </div>
 
               {/* Technical Indicators Interactive Sub-bar (Tanpa Display Angka Harga) */}
-              <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-1.5 bg-[#090D15] border-t border-slate-800/80 text-[10px] font-mono select-none">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <div className="flex items-center gap-1 text-slate-400 font-semibold mr-1">
+              <div className="flex items-center justify-between gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#090D15] border-t border-slate-800/80 text-[10px] font-mono select-none overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 text-slate-400 font-semibold mr-1 shrink-0">
                     <Activity className="w-3 h-3 text-sky-400" />
                     <span>{t.indicators || 'Indikator'}:</span>
                   </div>
@@ -6645,7 +6681,7 @@ function TradingGame() {
                   <button
                     type="button"
                     onClick={() => toggleIndicator('ema20')}
-                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                       indicators.ema20
                         ? 'bg-amber-500/15 border-amber-500/50 text-amber-300 font-bold shadow-sm'
                         : 'bg-slate-900/60 border-slate-800/80 text-slate-500 hover:text-slate-300'
@@ -6659,7 +6695,7 @@ function TradingGame() {
                   <button
                     type="button"
                     onClick={() => toggleIndicator('ema50')}
-                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                       indicators.ema50
                         ? 'bg-sky-500/15 border-sky-500/50 text-sky-300 font-bold shadow-sm'
                         : 'bg-slate-900/60 border-slate-800/80 text-slate-500 hover:text-slate-300'
@@ -6673,7 +6709,7 @@ function TradingGame() {
                   <button
                     type="button"
                     onClick={() => toggleIndicator('ema200')}
-                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                       indicators.ema200
                         ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold shadow-sm'
                         : 'bg-slate-900/60 border-slate-800/80 text-slate-500 hover:text-slate-300'
@@ -6687,7 +6723,7 @@ function TradingGame() {
                   <button
                     type="button"
                     onClick={() => toggleIndicator('bollinger')}
-                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                       indicators.bollinger
                         ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-bold shadow-sm'
                         : 'bg-slate-900/60 border-slate-800/80 text-slate-500 hover:text-slate-300'
@@ -6696,6 +6732,20 @@ function TradingGame() {
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
                     <span>BB (20, 2)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDrawingTools((prev) => !prev)}
+                    className={`px-2 py-0.5 rounded border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 sm:hidden ${
+                      showDrawingTools || activeDrawingTool
+                        ? 'bg-sky-500/20 border-sky-500/60 text-sky-300 font-bold shadow-sm'
+                        : 'bg-slate-900/60 border-slate-800/80 text-slate-500 hover:text-slate-300'
+                    }`}
+                    title="Buka / Tutup Alat Gambar Analisis Teknikal"
+                  >
+                    <PenTool className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span>{language === 'en' ? 'Draw' : 'Gambar'}</span>
                   </button>
                 </div>
 
@@ -6812,7 +6862,7 @@ function TradingGame() {
 
               {/* Floating TradingView-Style Left Drawing Toolbar */}
               <div 
-                className="absolute top-11 left-2 z-20 flex flex-col gap-1 p-1 bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-xl shadow-2xl select-none"
+                className={`absolute top-11 left-2 z-20 ${showDrawingTools ? 'flex' : 'hidden sm:flex'} flex-col gap-1 p-1 bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-xl shadow-2xl select-none`}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
@@ -7133,10 +7183,10 @@ function TradingGame() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <div className="bg-[#0B0E14] p-2 sm:p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1 min-w-0">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">{t.takeProfit || 'Take Profit (Opsional):'}</span>
+                      <span className="text-slate-400 truncate">{t.takeProfit || 'Take Profit:'}</span>
                       <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.tpSubHint || 'L > Entry | S < Entry'}</span>
                     </div>
                     <input
@@ -7145,14 +7195,14 @@ function TradingGame() {
                       placeholder={`${t.tpPlaceholder || 'Misal:'} ${(currentPrice * 1.1).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
                       value={tpInput}
                       onChange={(e) => setTpInput(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#00FF88] outline-none focus:border-[#00FF88]"
+                      className="bg-slate-900 border border-slate-700 rounded px-2 sm:px-2.5 py-1 text-xs font-mono text-[#00FF88] outline-none focus:border-[#00FF88] w-full"
                     />
-                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
-                      <span className="text-slate-500">
+                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5 truncate">
+                      <span className="text-slate-500 truncate mr-1">
                         {orderTpEst ? `${t.estProfit || 'Est. Cuan'} (${orderTpEst.plannedType}):` : `${t.estProfit || 'Est. Cuan'}:`}
                       </span>
                       {orderTpEst ? (
-                        <span className="font-bold text-[#00FF88]">
+                        <span className="font-bold text-[#00FF88] shrink-0">
                           +{formatMoney(orderTpEst.pnlDollar)} (+{orderTpEst.roiPercent.toFixed(1)}%)
                         </span>
                       ) : (
@@ -7161,9 +7211,9 @@ function TradingGame() {
                     </div>
                   </div>
 
-                  <div className="bg-[#0B0E14] p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1">
+                  <div className="bg-[#0B0E14] p-2 sm:p-2.5 rounded-xl border border-slate-800/80 flex flex-col gap-1 min-w-0">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">{t.stopLoss || 'Stop Loss (Opsional):'}</span>
+                      <span className="text-slate-400 truncate">{t.stopLoss || 'Stop Loss:'}</span>
                       <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t.slSubHint || 'L < Entry | S > Entry'}</span>
                     </div>
                     <input
@@ -7172,14 +7222,14 @@ function TradingGame() {
                       placeholder={`${t.slPlaceholder || 'Misal:'} ${(currentPrice * 0.9).toFixed(getPairPrecision(MARKET_PAIRS[selectedPairIdx], currentPrice))}`}
                       value={slInput}
                       onChange={(e) => setSlInput(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-[#FF3366] outline-none focus:border-[#FF3366]"
+                      className="bg-slate-900 border border-slate-700 rounded px-2 sm:px-2.5 py-1 text-xs font-mono text-[#FF3366] outline-none focus:border-[#FF3366] w-full"
                     />
-                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5">
-                      <span className="text-slate-500">
+                    <div className="flex items-center justify-between text-[10px] font-mono pt-0.5 truncate">
+                      <span className="text-slate-500 truncate mr-1">
                         {orderSlEst ? `${t.estLoss || 'Est. Rugi'} (${orderSlEst.plannedType}):` : `${t.estLoss || 'Est. Rugi'}:`}
                       </span>
                       {orderSlEst ? (
-                        <span className="font-bold text-[#FF3366]">
+                        <span className="font-bold text-[#FF3366] shrink-0">
                           {formatMoney(orderSlEst.pnlDollar)} ({orderSlEst.roiPercent.toFixed(1)}%)
                         </span>
                       ) : (
@@ -7189,29 +7239,29 @@ function TradingGame() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <button
                     onClick={() => openPosition('LONG')}
-                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#00FF88] to-emerald-500 hover:from-emerald-400 hover:to-[#00FF88] text-slate-950 font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#00FF88]/15 active:scale-[0.99] transition-all cursor-pointer"
+                    className="py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl bg-gradient-to-r from-[#00FF88] to-emerald-500 hover:from-emerald-400 hover:to-[#00FF88] text-slate-950 font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#00FF88]/15 active:scale-[0.99] transition-all cursor-pointer min-w-0"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-                      <span>{t.buyLong || 'BUY / LONG'} {leverage}x</span>
+                    <div className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <ArrowUpRight className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[2.5] shrink-0" />
+                      <span className="truncate">{t.buyLong || 'BUY / LONG'} {leverage}x</span>
                     </div>
-                    <span className="text-[10px] font-mono font-bold opacity-90">
+                    <span className="text-[9px] sm:text-[10px] font-mono font-bold opacity-90 truncate">
                       {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
                     </span>
                   </button>
 
                   <button
                     onClick={() => openPosition('SHORT')}
-                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF3366] to-rose-600 hover:from-rose-500 hover:to-[#FF3366] text-white font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#FF3366]/20 active:scale-[0.99] transition-all cursor-pointer"
+                    className="py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl bg-gradient-to-r from-[#FF3366] to-rose-600 hover:from-rose-500 hover:to-[#FF3366] text-white font-extrabold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-[#FF3366]/20 active:scale-[0.99] transition-all cursor-pointer min-w-0"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
-                      <span>{t.sellShort || 'SELL / SHORT'} {leverage}x</span>
+                    <div className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <ArrowDownRight className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[2.5] shrink-0" />
+                      <span className="truncate">{t.sellShort || 'SELL / SHORT'} {leverage}x</span>
                     </div>
-                    <span className="text-[10px] font-mono font-bold opacity-90">
+                    <span className="text-[9px] sm:text-[10px] font-mono font-bold opacity-90 truncate">
                       {t.orderSize || 'Size:'} {formatMoney(cash * (betPercent / 100) * leverage)}
                     </span>
                   </button>
