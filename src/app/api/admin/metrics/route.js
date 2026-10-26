@@ -63,6 +63,11 @@ export async function GET(request) {
     const positionsPage = Math.max(1, parseInt(searchParams.get('positionsPage') || '1', 10));
     const positionsLimit = Math.max(1, Math.min(100, parseInt(searchParams.get('positionsLimit') || '10', 10)));
 
+    const launchpadPage = Math.max(1, parseInt(searchParams.get('launchpadPage') || '1', 10));
+    const launchpadLimit = Math.max(1, Math.min(100, parseInt(searchParams.get('launchpadLimit') || '10', 10)));
+    const searchLaunchpad = (searchParams.get('searchLaunchpad') || '').trim().toLowerCase();
+    const launchpadStatus = searchParams.get('launchpadStatus') || 'all'; // 'all' | 'cashout' | 'rugged'
+
     const now = Date.now();
     const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
@@ -160,6 +165,7 @@ export async function GET(request) {
 
     const allActivePositions = [];
     const allRecentTrades = [];
+    const allLaunchpadActivities = [];
 
     const allPlayerList = users.map(u => {
       const save = u.save;
@@ -201,6 +207,52 @@ export async function GET(request) {
           userId: u.id
         });
       });
+
+      // Collect launchpad activities
+      const lpHistory = Array.isArray(save?.savePayload?.launchpadHistory)
+        ? save.savePayload.launchpadHistory
+        : (Array.isArray(save?.launchpadHistory) ? save.launchpadHistory : []);
+
+      if (lpHistory.length > 0) {
+        lpHistory.slice(-25).forEach(lp => {
+          allLaunchpadActivities.push({
+            id: lp.id || `lp-${u.id}-${Math.random().toString(36).slice(2, 6)}`,
+            timestamp: lp.timestamp || save.lastSavedAt,
+            username: u.username,
+            userId: u.id,
+            tokenSymbol: lp.tokenSymbol || '$MEME',
+            tokenName: lp.tokenName || 'Meme Rocket',
+            tokenColor: lp.tokenColor || '#10B981',
+            betAmount: Number(lp.betAmount || 0),
+            cashOutMultiplier: Number(lp.cashOutMultiplier || 0),
+            crashPoint: Number(lp.crashPoint || 0),
+            pnl: Number(lp.pnl || 0),
+            status: lp.status || (Number(lp.pnl || 0) >= 0 ? 'CASHOUT' : 'RUGGED')
+          });
+        });
+      } else {
+        // Fallback: extract from cashLogs if launchpadHistory not yet populated
+        const cashLogs = Array.isArray(save?.savePayload?.cashLogs) ? save.savePayload.cashLogs : [];
+        cashLogs.slice(-25).forEach((log, idx) => {
+          if (log && (log.type === 'MEME_WIN' || log.type === 'MEME_BET')) {
+            const isWin = log.type === 'MEME_WIN' || log.amount > 0;
+            allLaunchpadActivities.push({
+              id: `log-${u.id}-${idx}`,
+              timestamp: log.time || log.timestamp || save.lastSavedAt,
+              username: u.username,
+              userId: u.id,
+              tokenSymbol: log.tokenSymbol || '$PEPEWHALE',
+              tokenName: log.tokenName || 'Meme Rocket',
+              tokenColor: '#10B981',
+              betAmount: Math.abs(Number(log.amount || 1)),
+              cashOutMultiplier: isWin ? 2.0 : 0,
+              crashPoint: 2.0,
+              pnl: isWin ? Number(log.amount || 0) : -Math.abs(Number(log.amount || 1)),
+              status: isWin ? 'CASHOUT' : 'RUGGED'
+            });
+          }
+        });
+      }
 
       return {
         id: u.id,
@@ -259,6 +311,28 @@ export async function GET(request) {
     // Paginate active positions
     const totalPositions = allActivePositions.length;
     const paginatedPositions = allActivePositions.slice((positionsPage - 1) * positionsLimit, positionsPage * positionsLimit);
+
+    // Sort and filter launchpad activities
+    allLaunchpadActivities.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    let filteredLaunchpad = allLaunchpadActivities;
+    if (searchLaunchpad) {
+      filteredLaunchpad = filteredLaunchpad.filter(l =>
+        l.username.toLowerCase().includes(searchLaunchpad) ||
+        l.tokenSymbol.toLowerCase().includes(searchLaunchpad) ||
+        l.tokenName.toLowerCase().includes(searchLaunchpad)
+      );
+    }
+    if (launchpadStatus === 'cashout') {
+      filteredLaunchpad = filteredLaunchpad.filter(l => l.status === 'CASHOUT');
+    } else if (launchpadStatus === 'rugged') {
+      filteredLaunchpad = filteredLaunchpad.filter(l => l.status === 'RUGGED');
+    }
+    const totalLaunchpad = filteredLaunchpad.length;
+    const paginatedLaunchpad = filteredLaunchpad.slice((launchpadPage - 1) * launchpadLimit, launchpadPage * launchpadLimit);
+
+    const totalLaunchpadVolume = allLaunchpadActivities.reduce((acc, curr) => acc + (curr.betAmount || 0), 0);
+    const totalLaunchpadProfit = allLaunchpadActivities.filter(a => a.pnl > 0).reduce((acc, curr) => acc + curr.pnl, 0);
+    const highestLaunchpadMultiplier = allLaunchpadActivities.reduce((max, curr) => Math.max(max, curr.cashOutMultiplier || 0), 0);
 
     // 24-hour hourly trend aggregation
     const hourlyActivity = [];
@@ -342,6 +416,19 @@ export async function GET(request) {
         limit: tradesLimit,
         total: totalTrades,
         totalPages: Math.max(1, Math.ceil(totalTrades / tradesLimit))
+      },
+      launchpadActivities: paginatedLaunchpad,
+      launchpadPagination: {
+        page: launchpadPage,
+        limit: launchpadLimit,
+        total: totalLaunchpad,
+        totalPages: Math.max(1, Math.ceil(totalLaunchpad / launchpadLimit))
+      },
+      launchpadOverview: {
+        totalRounds: allLaunchpadActivities.length,
+        totalVolume: totalLaunchpadVolume,
+        totalProfitAwarded: totalLaunchpadProfit,
+        highestMultiplier: highestLaunchpadMultiplier
       }
     });
   } catch (error) {

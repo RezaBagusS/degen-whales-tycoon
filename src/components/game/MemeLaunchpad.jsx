@@ -32,6 +32,7 @@ export default function MemeLaunchpad({
   cash = 10,
   onPlaceBet,
   onWinCash,
+  onRecordHistory,
   formatMoney = (val) => `$${val.toFixed(2)}`,
   t = {},
   language = 'id',
@@ -89,6 +90,9 @@ export default function MemeLaunchpad({
 
   const onWinCashRef = useRef(onWinCash);
   onWinCashRef.current = onWinCash;
+
+  const onRecordHistoryRef = useRef(onRecordHistory);
+  onRecordHistoryRef.current = onRecordHistory;
 
   const isApedInRef = useRef(isApedIn);
   isApedInRef.current = isApedIn;
@@ -157,10 +161,22 @@ export default function MemeLaunchpad({
     if (onWinCashRef.current) {
       onWinCashRef.current(winTotal);
     }
+    if (onRecordHistoryRef.current) {
+      onRecordHistoryRef.current({
+        tokenSymbol: currentToken.symbol,
+        tokenName: currentToken.name,
+        tokenColor: currentToken.color,
+        betAmount: betAmountRef.current,
+        cashOutMultiplier: currentMult,
+        crashPoint: crashPointRef.current,
+        pnl: winTotal - betAmountRef.current,
+        status: 'CASHOUT'
+      });
+    }
     if (playSoundRef.current) {
       playSoundRef.current('tp');
     }
-  }, [gameState]);
+  }, [gameState, currentToken]);
 
   // Ape-In handler (supports active round or queueing for next round)
   const handleApeIn = () => {
@@ -246,6 +262,22 @@ export default function MemeLaunchpad({
         setGameState('CRASHED');
         setRecentCrashes((prev) => [crashPointRef.current, ...prev.slice(0, 9)]);
         if (playSoundRef.current) playSoundRef.current('sl');
+
+        // If player had an active bet and did NOT cash out before crash -> RUGGED!
+        if (isApedInRef.current && !hasCashedOutRef.current) {
+          if (onRecordHistoryRef.current) {
+            onRecordHistoryRef.current({
+              tokenSymbol: currentToken.symbol,
+              tokenName: currentToken.name,
+              tokenColor: currentToken.color,
+              betAmount: betAmountRef.current,
+              cashOutMultiplier: 0,
+              crashPoint: crashPointRef.current,
+              pnl: -betAmountRef.current,
+              status: 'RUGGED'
+            });
+          }
+        }
 
         // Reset for next launch after 3.5s
         setTimeout(() => {

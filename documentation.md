@@ -2,8 +2,8 @@
 
 Dokumentasi game dan proyek Next.js
 
-- Versi game: **1.6.1**
-- Basis kode: **Degen & Whale Multi-Item Support Compensation & Live Ops Edition**
+- Versi game: **1.6.2**
+- Basis kode: **Degen & Whale Meme Launchpad Tracker & Admin Ops Edition**
 - Tanggal dokumentasi: **26 Oktober 2026**
 - Bahasa antarmuka: Indonesia & English
 - Genre: idle tycoon dan simulasi trading fiktif
@@ -41,7 +41,8 @@ Dokumentasi game dan proyek Next.js
 25. [Admin Operations Center & APM Telemetry (v1.6.0)](#25-admin-operations-center--apm-telemetry-v160)
 26. [Global In-Game Broadcast Engine (v1.6.0)](#26-global-in-game-broadcast-engine-v160)
 27. [Player Moderation, Clean Progress Reset & Live Developer Compensation (v1.6.0)](#27-player-moderation-clean-progress-reset--live-developer-compensation-v160)
-28. [Catatan Rilis & Changelog Versi](#28-catatan-rilis--changelog-versi)
+28. [Sistem Audit & Pelacak Aktivitas Meme Launchpad Admin (v1.6.2)](#28-sistem-audit--pelacak-aktivitas-meme-launchpad-admin-v162)
+29. [Catatan Rilis & Changelog Versi](#29-catatan-rilis--changelog-versi)
 
 ## 1. Konsep dan tujuan
 
@@ -1065,7 +1066,36 @@ Endpoint aksi terpadu `/api/admin/player-action` menyediakan kontrol moderasi da
   - Pemain yang menerima kompensasi mendapatkan banner notifikasi khusus di dalam game (`data-testid="developer-compensation-banner"`).
   - Banner menampilkan rincian cash, token, dan item yang diterima serta tombol tutup/klaim manual yang responsif.
 
-## 28. Catatan Rilis & Changelog Versi
+## 28. Sistem Audit & Pelacak Aktivitas Meme Launchpad Admin (v1.6.2)
+
+Portal Admin Ops Center v2 kini dilengkapi dengan modul audit dan pemantau aktivitas Meme Launchpad secara real-time dan terperinci.
+
+- **Perekaman Aktivitas Putaran (Meme History Engine)**:
+  - Setiap kali pemain melakukan snipe pada Meme Launchpad (baik berakhir dengan **CASHOUT** menguntungkan atau **RUGGED** akibat crash), data putaran dicatat secara otomatis ke dalam `launchpadHistory` di state pemain (`src/components/game/MemeLaunchpad.jsx` dan `src/components/game/Game.jsx`).
+  - Atribut yang dicatat mencakup: `id`, `timestamp`, `tokenSymbol`, `tokenName`, `tokenColor`, `betAmount`, `cashOutMultiplier`, `crashPoint`, `pnl`, dan `status`.
+  - Data disinkronkan ke cloud save secara efisien (dibatasi maksimum 50 riwayat terbaru per pemain untuk menjaga ukuran payload tetap ringan).
+- **Agregasi Metrik & Audit Backend (`/api/admin/metrics`)**:
+  - Backend mengekstraksi seluruh aktivitas launchpad dari seluruh pemain terdaftar dengan fallback cerdas ke log transaksi (`cashLogs: MEME_WIN / MEME_BET`) untuk kompatibilitas data lama.
+  - Menyediakan perhitungan metrik ikhtisar:
+    - **Total Putaran Snipe**: Akumulasi seluruh putaran meme yang dimainkan pemain.
+    - **Total Volume Snipe**: Akumulasi modal kas yang dipertaruhkan pemain.
+    - **Total Profit Realized**: Akumulasi kemenangan bersih yang berhasil di-cash out oleh para pemain.
+    - **Rekor Multiplier Tertinggi**: Multiplier exit tertinggi yang pernah dicapai pemain.
+  - Mendukung parameter kueri filter status (`all`, `cashout`, `rugged`), pencarian keyword pemain/token, serta pagination mandiri.
+- **Antarmuka Admin Ops (`src/app/admin/page.jsx`)**:
+  - **Overview Feed Switcher**: Tombol pengalih antara `[Perpetual Trades]` dan `[Meme Launchpad]` di tab Overview untuk fleksibilitas monitoring harian.
+  - **Dedicated Tab `🚀 Meme Launchpad`**: Tab terdedikasi dengan 4 KPI summary cards, filter pills interaktif, pencarian debounced, tabel audit status visual (CASHOUT warna hijau, RUGGED warna merah), dan tombol ekspor CSV instant (`exportLaunchpadToCSV`).
+
+## 29. Catatan Rilis & Changelog Versi
+
+### Versi 1.6.2 (26 Oktober 2026) — Meme Launchpad Tracker & Admin Ops
+- **Fitur Baru & Penyempurnaan**:
+  - **Meme Launchpad Activity Feed**: Pencatatan riwayat putaran Meme Launchpad real-time untuk setiap pemain (cashout maupun dev rugpull).
+  - **Launchpad Overview KPIs**: 4 metrik agregasi baru di admin dashboard (Total Putaran Snipe, Total Volume Snipe, Total Profit Realized, dan Rekor Multiplier Tertinggi).
+  - **Overview Feed Switcher**: Pengalih tab feed antara Perpetual Trades dan Meme Launchpad pada tab Overview.
+  - **Dedicated Launchpad Tab**: Tab `🚀 Meme Launchpad` di admin portal dengan filter status (`Semua`, `🚀 Cashed Out`, `💥 Rugged`), pencarian pemain/token, pagination, dan ekspor CSV.
+- **Pengujian & Verifikasi**:
+  - Penambahan automated test suite Playwright `admin dashboard provides meme launchpad tracker, filters, and feed switcher`. Semua 13 admin tests dan 19 game tests terverifikasi lolos 100%.
 
 ### Versi 1.6.1 (26 Oktober 2026) — Multi-Item Support Compensation & Live Ops
 - **Fitur Baru & Penyempurnaan**:

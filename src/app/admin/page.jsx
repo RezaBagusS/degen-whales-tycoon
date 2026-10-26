@@ -37,7 +37,9 @@ import {
   ChevronDown,
   Plus,
   Trash2,
-  Package
+  Package,
+  Rocket,
+  Zap
 } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../lib/version';
 
@@ -381,6 +383,13 @@ export default function AdminDashboard() {
   const [positionsPage, setPositionsPage] = useState(1);
   const [positionsLimit, setPositionsLimit] = useState(10);
 
+  const [launchpadPage, setLaunchpadPage] = useState(1);
+  const [launchpadLimit, setLaunchpadLimit] = useState(10);
+  const [searchLaunchpad, setSearchLaunchpad] = useState('');
+  const [searchLaunchpadInput, setSearchLaunchpadInput] = useState('');
+  const [launchpadStatusFilter, setLaunchpadStatusFilter] = useState('all'); // 'all' | 'cashout' | 'rugged'
+  const [feedViewMode, setFeedViewMode] = useState('trades'); // 'trades' | 'launchpad'
+
   const [apmPage, setApmPage] = useState(1);
   const [apmLimit, setApmLimit] = useState(10);
 
@@ -462,6 +471,11 @@ export default function AdminDashboard() {
       const posPage = params.positionsPage ?? positionsPage;
       const posLimit = params.positionsLimit ?? positionsLimit;
 
+      const lpPage = params.launchpadPage ?? launchpadPage;
+      const lpLimit = params.launchpadLimit ?? launchpadLimit;
+      const lpStatus = params.launchpadStatus ?? launchpadStatusFilter;
+      const lpSearch = params.searchLaunchpad !== undefined ? params.searchLaunchpad : searchLaunchpad;
+
       q.set('playersPage', String(pPage));
       q.set('playersLimit', String(pLimit));
       q.set('playerStatus', String(pStatus));
@@ -472,6 +486,11 @@ export default function AdminDashboard() {
 
       q.set('positionsPage', String(posPage));
       q.set('positionsLimit', String(posLimit));
+
+      q.set('launchpadPage', String(lpPage));
+      q.set('launchpadLimit', String(lpLimit));
+      q.set('launchpadStatus', String(lpStatus));
+      if (lpSearch) q.set('searchLaunchpad', lpSearch);
 
       const res = await fetch(`/api/admin/metrics?${q.toString()}`);
       if (res.status === 401) {
@@ -497,7 +516,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [adminKey, playersPage, playersLimit, playerStatusFilter, searchPlayer, tradesPage, tradesLimit, positionsPage, positionsLimit]);
+  }, [adminKey, playersPage, playersLimit, playerStatusFilter, searchPlayer, tradesPage, tradesLimit, positionsPage, positionsLimit, launchpadPage, launchpadLimit, launchpadStatusFilter, searchLaunchpad]);
 
   // Initial fetch on authenticated
   useEffect(() => {
@@ -578,6 +597,30 @@ export default function AdminDashboard() {
     const a = document.createElement('a');
     a.href = encoded;
     a.download = `degen_whales_trades_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Export Meme Launchpad Activities to CSV
+  const exportLaunchpadToCSV = () => {
+    if (!data?.launchpadActivities?.length) return;
+    const headers = ['Waktu', 'Username', 'Token', 'Modal Snipe ($)', 'Multiplier Exit', 'Crash Point', 'PnL ($)', 'Status'];
+    const rows = data.launchpadActivities.map((l) => [
+      `"${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}"`,
+      `"${l.username}"`,
+      `"${l.tokenSymbol} (${l.tokenName})"`,
+      l.betAmount || 0,
+      `${(l.cashOutMultiplier || 0).toFixed(2)}x`,
+      `${(l.crashPoint || 0).toFixed(2)}x`,
+      l.pnl || 0,
+      `"${l.status}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encoded = encodeURI(csvContent);
+    const a = document.createElement('a');
+    a.href = encoded;
+    a.download = `degen_launchpad_activity_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1008,6 +1051,18 @@ export default function AdminDashboard() {
           </button>
 
           <button
+            onClick={() => setActiveTab('launchpad')}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
+              activeTab === 'launchpad'
+                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Rocket className="w-4 h-4" />
+            <span>Meme Launchpad ({data?.launchpadPagination?.total ?? (data?.launchpadOverview?.totalRounds || 0)})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('apm')}
             className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all ${
               activeTab === 'apm'
@@ -1204,125 +1259,275 @@ export default function AdminDashboard() {
             {/* 24-Hour Interactive Activity Trend Chart */}
             <HourlyTrendChart data={data?.hourlyActivity || []} />
 
-            {/* Closed Trade Feed with Pagination */}
+            {/* Feed Section: Perpetual Trades vs Meme Launchpad */}
             <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-sky-400" />
-                  <span className="font-mono font-bold text-sm text-white">Riwayat Transaksi Selesai (Closed Trade Feed)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
-                    Realized PnL • Posisi Sudah Ditutup
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-mono text-slate-500">
-                    Total Tercatat: {data?.tradesPagination?.total ?? 0} Transaksi
-                  </span>
-                  {data?.recentTrades?.length > 0 && (
+                  <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs font-mono">
                     <button
                       type="button"
-                      onClick={exportTradesToCSV}
-                      className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                      title="Export Riwayat Transaksi ke CSV"
+                      onClick={() => setFeedViewMode('trades')}
+                      className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        feedViewMode === 'trades'
+                          ? 'bg-sky-500 text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
                     >
-                      <Download className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Export CSV</span>
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>Perpetual Trades ({data?.tradesPagination?.total ?? 0})</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedViewMode('launchpad')}
+                      className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        feedViewMode === 'launchpad'
+                          ? 'bg-rose-500 text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Rocket className="w-3.5 h-3.5" />
+                      <span>Meme Launchpad ({data?.launchpadPagination?.total ?? (data?.launchpadOverview?.totalRounds || 0)})</span>
+                    </button>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono hidden sm:inline">
+                    {feedViewMode === 'trades' ? 'Realized PnL • Posisi Selesai' : 'Rocket Pump & Dump Snipe Feed'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Total: {feedViewMode === 'trades' ? (data?.tradesPagination?.total ?? 0) : (data?.launchpadPagination?.total ?? 0)} Data
+                  </span>
+                  {feedViewMode === 'trades' ? (
+                    data?.recentTrades?.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={exportTradesToCSV}
+                        className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                        title="Export Riwayat Transaksi ke CSV"
+                      >
+                        <Download className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Export CSV</span>
+                      </button>
+                    )
+                  ) : (
+                    data?.launchpadActivities?.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={exportLaunchpadToCSV}
+                        className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                        title="Export Riwayat Launchpad ke CSV"
+                      >
+                        <Download className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Export CSV</span>
+                      </button>
+                    )
                   )}
                 </div>
               </div>
 
-              <div className="relative overflow-x-auto rounded-xl">
-                {loading && (
-                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
-                    <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center gap-2 shadow-2xl">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Memuat riwayat transaksi...</span>
-                    </div>
-                  </div>
-                )}
+              {feedViewMode === 'trades' ? (
+                <>
+                  <div className="relative overflow-x-auto rounded-xl">
+                    {loading && (
+                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center gap-2 shadow-2xl">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Memuat riwayat transaksi...</span>
+                        </div>
+                      </div>
+                    )}
 
-                <table className="w-full text-left font-mono text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
-                      <th className="py-2 px-3">Waktu</th>
-                      <th className="py-2 px-3">Pemain</th>
-                      <th className="py-2 px-3">Pair</th>
-                      <th className="py-2 px-3">Arah / Lev</th>
-                      <th className="py-2 px-3">Harga Entry / Exit</th>
-                      <th className="py-2 px-3 text-right">PnL Realized</th>
-                    </tr>
-                  </thead>
-                  {!data ? (
-                    <TableSkeleton cols={6} rows={tradesLimit} />
-                  ) : (!data.recentTrades || data.recentTrades.length === 0) ? (
-                    <tbody>
-                      <tr>
-                        <td colSpan={6} className="text-center py-8 text-slate-500 font-mono text-xs">
-                          Belum ada riwayat transaksi yang tercatat di database.
-                        </td>
-                      </tr>
-                    </tbody>
-                  ) : (
-                    <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                      {data.recentTrades.map((t, idx) => {
-                        const isWin = (t.pnl || 0) >= 0;
-                        const hasPrices = t.entryPrice && t.exitPrice && (t.entryPrice > 0 || t.exitPrice > 0);
-                        return (
-                          <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
-                            <td className="py-2 px-3 text-slate-500 text-[11px]">
-                              {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Tersimpan'}
-                            </td>
-                            <td className="py-2 px-3 font-semibold text-white">
-                              {t.username}
-                            </td>
-                            <td className="py-2 px-3 text-sky-300 font-bold">
-                              {t.pairSymbol || 'DEGEN/USDT'}
-                            </td>
-                            <td className="py-2 px-3">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                t.type === 'LONG' ? 'bg-emerald-500/10 text-[#00FF88]' : 'bg-rose-500/10 text-rose-400'
-                              }`}>
-                                {t.type} {t.leverage}x
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-slate-400 text-[11px]">
-                              {hasPrices ? (
-                                `${formatMoney(t.entryPrice)} → ${formatMoney(t.exitPrice)}`
-                              ) : (
-                                <span className="text-slate-500 italic">Selesai (Closed)</span>
-                              )}
-                            </td>
-                            <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
-                              {isWin ? `+${formatMoney(t.pnl)}` : `-${formatMoney(Math.abs(t.pnl))}`}
+                    <table className="w-full text-left font-mono text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                          <th className="py-2 px-3">Waktu</th>
+                          <th className="py-2 px-3">Pemain</th>
+                          <th className="py-2 px-3">Pair</th>
+                          <th className="py-2 px-3">Arah / Lev</th>
+                          <th className="py-2 px-3">Harga Entry / Exit</th>
+                          <th className="py-2 px-3 text-right">PnL Realized</th>
+                        </tr>
+                      </thead>
+                      {!data ? (
+                        <TableSkeleton cols={6} rows={tradesLimit} />
+                      ) : (!data.recentTrades || data.recentTrades.length === 0) ? (
+                        <tbody>
+                          <tr>
+                            <td colSpan={6} className="text-center py-8 text-slate-500 font-mono text-xs">
+                              Belum ada riwayat transaksi yang tercatat di database.
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  )}
-                </table>
-              </div>
+                        </tbody>
+                      ) : (
+                        <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                          {data.recentTrades.map((t, idx) => {
+                            const isWin = (t.pnl || 0) >= 0;
+                            const hasPrices = t.entryPrice && t.exitPrice && (t.entryPrice > 0 || t.exitPrice > 0);
+                            return (
+                              <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
+                                <td className="py-2 px-3 text-slate-500 text-[11px]">
+                                  {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Tersimpan'}
+                                </td>
+                                <td className="py-2 px-3 font-semibold text-white">
+                                  {t.username}
+                                </td>
+                                <td className="py-2 px-3 text-sky-300 font-bold">
+                                  {t.pairSymbol || 'DEGEN/USDT'}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    t.type === 'LONG' ? 'bg-emerald-500/10 text-[#00FF88]' : 'bg-rose-500/10 text-rose-400'
+                                  }`}>
+                                    {t.type} {t.leverage}x
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-slate-400 text-[11px]">
+                                  {hasPrices ? (
+                                    `${formatMoney(t.entryPrice)} → ${formatMoney(t.exitPrice)}`
+                                  ) : (
+                                    <span className="text-slate-500 italic">Selesai (Closed)</span>
+                                  )}
+                                </td>
+                                <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
+                                  {isWin ? `+${formatMoney(t.pnl)}` : `-${formatMoney(Math.abs(t.pnl))}`}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      )}
+                    </table>
+                  </div>
 
-              {/* Trades Pagination Control */}
-              {data?.tradesPagination && (
-                <PaginationControl
-                  page={data.tradesPagination.page}
-                  totalPages={data.tradesPagination.totalPages}
-                  total={data.tradesPagination.total}
-                  limit={tradesLimit}
-                  disabled={loading}
-                  label="transaksi"
-                  onPageChange={(newPage) => {
-                    setTradesPage(newPage);
-                    fetchMetrics(adminKey, { tradesPage: newPage });
-                  }}
-                  onLimitChange={(newLimit) => {
-                    setTradesLimit(newLimit);
-                    setTradesPage(1);
-                    fetchMetrics(adminKey, { tradesLimit: newLimit, tradesPage: 1 });
-                  }}
-                />
+                  {data?.tradesPagination && (
+                    <PaginationControl
+                      page={data.tradesPagination.page}
+                      totalPages={data.tradesPagination.totalPages}
+                      total={data.tradesPagination.total}
+                      limit={tradesLimit}
+                      disabled={loading}
+                      label="transaksi"
+                      onPageChange={(newPage) => {
+                        setTradesPage(newPage);
+                        fetchMetrics(adminKey, { tradesPage: newPage });
+                      }}
+                      onLimitChange={(newLimit) => {
+                        setTradesLimit(newLimit);
+                        setTradesPage(1);
+                        fetchMetrics(adminKey, { tradesLimit: newLimit, tradesPage: 1 });
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="relative overflow-x-auto rounded-xl">
+                    {loading && (
+                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-500/30 text-xs font-mono text-rose-400 flex items-center gap-2 shadow-2xl">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Memuat aktivitas launchpad...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <table className="w-full text-left font-mono text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                          <th className="py-2 px-3">Waktu</th>
+                          <th className="py-2 px-3">Pemain</th>
+                          <th className="py-2 px-3">Token Meme</th>
+                          <th className="py-2 px-3 text-right">Modal Snipe</th>
+                          <th className="py-2 px-3 text-center">Multiplier Exit</th>
+                          <th className="py-2 px-3 text-right">PnL Realized</th>
+                          <th className="py-2 px-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      {!data ? (
+                        <TableSkeleton cols={7} rows={launchpadLimit} />
+                      ) : (!data.launchpadActivities || data.launchpadActivities.length === 0) ? (
+                        <tbody>
+                          <tr>
+                            <td colSpan={7} className="text-center py-8 text-slate-500 font-mono text-xs">
+                              Belum ada aktivitas Meme Launchpad yang tercatat di database.
+                            </td>
+                          </tr>
+                        </tbody>
+                      ) : (
+                        <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                          {data.launchpadActivities.map((l, idx) => {
+                            const isWin = l.status === 'CASHOUT' || (l.pnl || 0) > 0;
+                            return (
+                              <tr key={l.id || idx} className="hover:bg-slate-900/50 transition-colors">
+                                <td className="py-2 px-3 text-slate-500 text-[11px]">
+                                  {l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : 'Tersimpan'}
+                                </td>
+                                <td className="py-2 px-3 font-semibold text-white">
+                                  {l.username}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: l.tokenColor || '#10B981' }} />
+                                    {l.tokenSymbol || '$MEME'}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-right text-slate-300">
+                                  {formatMoney(l.betAmount || 0)}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {isWin ? (
+                                    <span className="font-bold text-[#00FF88]">
+                                      {(l.cashOutMultiplier || 0).toFixed(2)}x
+                                    </span>
+                                  ) : (
+                                    <span className="text-rose-400 font-bold text-[11px]">
+                                      💥 Crash @ {(l.crashPoint || 0).toFixed(2)}x
+                                    </span>
+                                  )}
+                                </td>
+                                <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
+                                  {isWin ? `+${formatMoney(l.pnl)}` : `-${formatMoney(Math.abs(l.pnl))}`}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {isWin ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00FF88] text-[10px] font-bold border border-emerald-500/20">
+                                      🚀 CASHOUT
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20">
+                                      💥 RUGGED
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      )}
+                    </table>
+                  </div>
+
+                  {data?.launchpadPagination && (
+                    <PaginationControl
+                      page={data.launchpadPagination.page}
+                      totalPages={data.launchpadPagination.totalPages}
+                      total={data.launchpadPagination.total}
+                      limit={launchpadLimit}
+                      disabled={loading}
+                      label="aktivitas launchpad"
+                      onPageChange={(newPage) => {
+                        setLaunchpadPage(newPage);
+                        fetchMetrics(adminKey, { launchpadPage: newPage });
+                      }}
+                      onLimitChange={(newLimit) => {
+                        setLaunchpadLimit(newLimit);
+                        setLaunchpadPage(1);
+                        fetchMetrics(adminKey, { launchpadLimit: newLimit, launchpadPage: 1 });
+                      }}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2163,6 +2368,264 @@ export default function AdminDashboard() {
                 }}
               />
             )}
+          </div>
+        )}
+
+        {/* TAB: MEME LAUNCHPAD ACTIVITY TRACKER */}
+        {activeTab === 'launchpad' && (
+          <div className="flex flex-col gap-5">
+            {/* Launchpad KPI Overview Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-4 rounded-2xl bg-[#0B0F19] border border-slate-800 flex flex-col gap-1">
+                <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                  <Rocket className="w-3.5 h-3.5 text-rose-400" />
+                  Total Putaran Snipe
+                </span>
+                <span className="text-xl sm:text-2xl font-mono font-bold text-white">
+                  {(data?.launchpadOverview?.totalRounds || 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">Putaran meme terakumulasi</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#0B0F19] border border-slate-800 flex flex-col gap-1">
+                <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  Total Volume Snipe
+                </span>
+                <span className="text-xl sm:text-2xl font-mono font-bold text-amber-400">
+                  {formatMoney(data?.launchpadOverview?.totalVolume || 0)}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">Total modal yang di-ape in</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#0B0F19] border border-slate-800 flex flex-col gap-1">
+                <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-[#00FF88]" />
+                  Total Profit Realized
+                </span>
+                <span className="text-xl sm:text-2xl font-mono font-bold text-[#00FF88]">
+                  {formatMoney(data?.launchpadOverview?.totalProfit || 0)}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">Kemenangan cashout pemain</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#0B0F19] border border-slate-800 flex flex-col gap-1">
+                <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-purple-400" />
+                  Rekor Multiplier Tertinggi
+                </span>
+                <span className="text-xl sm:text-2xl font-mono font-bold text-purple-400">
+                  {(data?.launchpadOverview?.highestMultiplier || 0).toFixed(2)}x
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">Peak exit multiplier</span>
+              </div>
+            </div>
+
+            {/* Launchpad Activity Feed & Data Table */}
+            <div className="bg-[#0B0F19] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-mono font-bold text-sm text-white flex items-center gap-2">
+                    <Rocket className="w-4 h-4 text-rose-400" />
+                    <span>Live Meme Launchpad Audit Feed</span>
+                  </h3>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Audit setiap aksi snipe, cashout, maupun dev rugpull secara real-time ({data?.launchpadPagination?.total || 0} Riwayat)
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search Bar */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setSearchLaunchpad(searchLaunchpadInput);
+                      setLaunchpadPage(1);
+                      fetchMetrics(adminKey, { searchLaunchpad: searchLaunchpadInput, launchpadPage: 1 });
+                    }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={searchLaunchpadInput}
+                        onChange={(e) => setSearchLaunchpadInput(e.target.value)}
+                        placeholder="Cari pemain / token..."
+                        className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-white placeholder:text-slate-500 outline-none focus:border-rose-500 w-44 sm:w-52 transition-all"
+                      />
+                    </div>
+                    {searchLaunchpad && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchLaunchpad('');
+                          setSearchLaunchpadInput('');
+                          setLaunchpadPage(1);
+                          fetchMetrics(adminKey, { searchLaunchpad: '', launchpadPage: 1 });
+                        }}
+                        className="px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-mono"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </form>
+
+                  {/* Status Filters */}
+                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 font-mono text-xs">
+                    <button
+                      onClick={() => {
+                        setLaunchpadStatusFilter('all');
+                        setLaunchpadPage(1);
+                        fetchMetrics(adminKey, { launchpadStatus: 'all', launchpadPage: 1 });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${launchpadStatusFilter === 'all' ? 'bg-rose-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      Semua
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLaunchpadStatusFilter('cashout');
+                        setLaunchpadPage(1);
+                        fetchMetrics(adminKey, { launchpadStatus: 'cashout', launchpadPage: 1 });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${launchpadStatusFilter === 'cashout' ? 'bg-[#00FF88] text-slate-950 font-bold' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      🚀 Cashed Out
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLaunchpadStatusFilter('rugged');
+                        setLaunchpadPage(1);
+                        fetchMetrics(adminKey, { launchpadStatus: 'rugged', launchpadPage: 1 });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${launchpadStatusFilter === 'rugged' ? 'bg-rose-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      💥 Rugged
+                    </button>
+                  </div>
+
+                  {/* Export CSV */}
+                  <button
+                    onClick={exportLaunchpadToCSV}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-mono text-xs cursor-pointer transition-colors border border-slate-700"
+                    title="Export CSV"
+                  >
+                    <Download className="w-3.5 h-3.5 text-rose-400" />
+                    <span className="hidden sm:inline">Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="relative overflow-x-auto rounded-xl">
+                {loading && (
+                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200">
+                    <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-500/30 text-xs font-mono text-rose-400 flex items-center gap-2 shadow-2xl">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Memuat riwayat launchpad...</span>
+                    </div>
+                  </div>
+                )}
+
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                      <th className="py-2.5 px-3">Waktu</th>
+                      <th className="py-2.5 px-3">Pemain</th>
+                      <th className="py-2.5 px-3">Token Meme</th>
+                      <th className="py-2.5 px-3 text-right">Modal Snipe</th>
+                      <th className="py-2.5 px-3 text-center">Multiplier Exit</th>
+                      <th className="py-2.5 px-3 text-right">PnL Realized</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  {!data ? (
+                    <TableSkeleton cols={7} rows={launchpadLimit} />
+                  ) : (!data.launchpadActivities || data.launchpadActivities.length === 0) ? (
+                    <tbody>
+                      <tr>
+                        <td colSpan={7} className="text-center py-12 text-slate-500 font-mono text-xs">
+                          Tidak ditemukan aktivitas Meme Launchpad yang cocok.
+                        </td>
+                      </tr>
+                    </tbody>
+                  ) : (
+                    <tbody className={`divide-y divide-slate-800/60 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                      {data.launchpadActivities.map((l, idx) => {
+                        const isWin = l.status === 'CASHOUT' || (l.pnl || 0) > 0;
+                        return (
+                          <tr key={l.id || idx} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                              {l.timestamp ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Tersimpan'}
+                            </td>
+                            <td className="py-2.5 px-3 font-semibold text-white">
+                              {l.username}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: l.tokenColor || '#10B981' }} />
+                                <span>{l.tokenSymbol || '$MEME'}</span>
+                                {l.tokenName && <span className="text-[10px] text-slate-500 hidden sm:inline">({l.tokenName})</span>}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-300">
+                              {formatMoney(l.betAmount || 0)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isWin ? (
+                                <span className="font-bold text-[#00FF88]">
+                                  {(l.cashOutMultiplier || 0).toFixed(2)}x
+                                </span>
+                              ) : (
+                                <span className="text-rose-400 font-bold text-[11px]">
+                                  💥 Crash @ {(l.crashPoint || 0).toFixed(2)}x
+                                </span>
+                              )}
+                            </td>
+                            <td className={`py-2.5 px-3 text-right font-bold ${isWin ? 'text-[#00FF88]' : 'text-rose-400'}`}>
+                              {isWin ? `+${formatMoney(l.pnl)}` : `-${formatMoney(Math.abs(l.pnl))}`}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isWin ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-[#00FF88] text-[10px] font-bold border border-emerald-500/20">
+                                  🚀 CASHOUT
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20">
+                                  💥 RUGGED
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  )}
+                </table>
+              </div>
+
+              {/* Launchpad Pagination Control */}
+              {data?.launchpadPagination && (
+                <PaginationControl
+                  page={data.launchpadPagination.page}
+                  totalPages={data.launchpadPagination.totalPages}
+                  total={data.launchpadPagination.total}
+                  limit={launchpadLimit}
+                  disabled={loading}
+                  label="riwayat launchpad"
+                  onPageChange={(newPage) => {
+                    setLaunchpadPage(newPage);
+                    fetchMetrics(adminKey, { launchpadPage: newPage });
+                  }}
+                  onLimitChange={(newLimit) => {
+                    setLaunchpadLimit(newLimit);
+                    setLaunchpadPage(1);
+                    fetchMetrics(adminKey, { launchpadLimit: newLimit, launchpadPage: 1 });
+                  }}
+                />
+              )}
+            </div>
           </div>
         )}
 

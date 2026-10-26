@@ -25,6 +25,11 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
     expect(json.playersPagination).toBeDefined();
     expect(json.tradesPagination).toBeDefined();
     expect(json.positionsPagination).toBeDefined();
+    expect(json.launchpadActivities).toBeDefined();
+    expect(Array.isArray(json.launchpadActivities)).toBe(true);
+    expect(json.launchpadPagination).toBeDefined();
+    expect(json.launchpadOverview).toBeDefined();
+    expect(typeof json.launchpadOverview.totalRounds).toBe('number');
   });
 
   test('supports pagination parameters in /api/admin/metrics', async ({ request }) => {
@@ -445,6 +450,52 @@ test.describe('Admin & Ops Monitoring Dashboard', () => {
         isBanned: false
       }
     });
+  });
+
+  test('admin dashboard provides meme launchpad tracker, filters, and feed switcher', async ({ request, page }) => {
+    // 1. Verify API filtering and pagination
+    const apiRes = await request.get('/api/admin/metrics?launchpadPage=1&launchpadLimit=5&launchpadStatus=cashout', {
+      headers: { 'x-admin-key': adminKey }
+    });
+    expect(apiRes.status()).toBe(200);
+    const json = await apiRes.json();
+    expect(json.launchpadPagination.page).toBe(1);
+    expect(json.launchpadPagination.limit).toBe(5);
+    expect(json.launchpadOverview).toBeDefined();
+
+    // 2. Open Admin UI and authenticate
+    await page.goto('/admin');
+    await page.locator('input[type="password"]').fill(adminKey);
+    await page.getByRole('button', { name: /Buka Dashboard Ops/i }).click();
+
+    // 3. Overview Tab: Switch feed to Meme Launchpad
+    const overviewMemeSwitcher = page.locator('button').filter({ hasText: /Meme Launchpad/i }).nth(1);
+    await expect(overviewMemeSwitcher).toBeVisible();
+    await overviewMemeSwitcher.click();
+    await expect(page.getByText('Token Meme').first()).toBeVisible();
+    await expect(page.getByText('Modal Snipe').first()).toBeVisible();
+
+    // Switch feed back to Perpetual Trades
+    await page.getByRole('button', { name: /Perpetual Trades/i }).click();
+    await expect(page.getByText('Pair').first()).toBeVisible();
+    await expect(page.getByText('Arah / Lev').first()).toBeVisible();
+
+    // 4. Navigate to dedicated Meme Launchpad tab via top navbar
+    const launchpadTabNav = page.locator('button').filter({ hasText: /Meme Launchpad/i }).first();
+    await launchpadTabNav.click();
+
+    // Verify KPI Cards
+    await expect(page.getByText('Total Putaran Snipe')).toBeVisible();
+    await expect(page.getByText('Total Volume Snipe')).toBeVisible();
+    await expect(page.getByText('Total Profit Realized')).toBeVisible();
+    await expect(page.getByText('Rekor Multiplier Tertinggi')).toBeVisible();
+
+    // Verify Audit Feed Header & Filter Controls
+    await expect(page.getByText('Live Meme Launchpad Audit Feed')).toBeVisible();
+    await expect(page.getByPlaceholder('Cari pemain / token...')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Cashed Out/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Rugged/i })).toBeVisible();
+    await expect(page.getByTitle('Export CSV')).toBeVisible();
   });
 });
 

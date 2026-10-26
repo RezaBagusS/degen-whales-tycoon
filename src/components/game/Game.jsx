@@ -951,7 +951,7 @@ const finiteNonnegative = (n, fallback = 0) =>
 function loadGame() {
   const fresh = {
     cash: 10, peakNetWorth: 10, whaleTokens: 0, passiveLevels: emptyLevels(),
-    activePositions: [], activePosition: null, tradeHistory: [], cashLogs: [], lastDailyClaim: 0,
+    activePositions: [], activePosition: null, tradeHistory: [], launchpadHistory: [], cashLogs: [], lastDailyClaim: 0,
     lastWhaleFaucetClaim: 0,
     lastCashAdClaim: 0,
     selectedPairIdx: 0, selectedTfIdx: 0,
@@ -1107,6 +1107,7 @@ function loadGame() {
       tradeHistory: Array.isArray(saved.tradeHistory) ? saved.tradeHistory
         .filter(t => t && typeof t.pair === 'string' && Number.isFinite(t.pnl)
           && Number.isFinite(t.roi)).slice(0, 20) : [],
+      launchpadHistory: Array.isArray(saved.launchpadHistory) ? saved.launchpadHistory.slice(0, 50) : [],
       selectedPairIdx: pairIdx,
       selectedTfIdx: Number.isInteger(saved.selectedTfIdx) && TIMEFRAMES[saved.selectedTfIdx]
         ? saved.selectedTfIdx : 0,
@@ -1419,6 +1420,7 @@ function TradingGame() {
   }, [selectedPairIdx]);
 
   const [tradeHistory, setTradeHistory] = useState(initial.tradeHistory);
+  const [launchpadHistory, setLaunchpadHistory] = useState(initial.launchpadHistory || []);
   const [tickerIdx, setTickerIdx] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [mousePos, setMousePos] = useState({ x: null, y: null });
@@ -1907,6 +1909,7 @@ function TradingGame() {
     setPassiveLevels(fresh.passiveLevels);
     setInventory(fresh.inventory);
     setTradeHistory([]);
+    setLaunchpadHistory([]);
     setCashLogs([]);
 
     // 4. Redirect to login page cleanly without infinite reload loop
@@ -3246,7 +3249,7 @@ function TradingGame() {
     latest.current = {
       cash, peakNetWorth: Math.max(peakNetWorth, netWorth), whaleTokens, passiveLevels,
       activePositions, activePosition: activePositions.length > 0 ? activePositions[0] : null,
-      tradeHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
+      tradeHistory, launchpadHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
       inventory, activeEffects, dailyWhaleUsage
@@ -3274,6 +3277,7 @@ function TradingGame() {
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
         tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        launchpadHistory: (state.launchpadHistory || []).slice(0, 50),
         cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
       }));
@@ -3302,6 +3306,7 @@ function TradingGame() {
           syncVersion: 2,
           marketPrices: [...marketPricesRef.current],
           tradeHistory: (state.tradeHistory || []).slice(0, 10),
+          launchpadHistory: (state.launchpadHistory || []).slice(0, 25),
           cashLogs: (state.cashLogs || []).slice(0, 30),
           lastTimestamp: Date.now()
         }));
@@ -3322,6 +3327,7 @@ function TradingGame() {
         syncVersion: 2,
         marketPrices: [...marketPricesRef.current],
         tradeHistory: (state.tradeHistory || []).slice(0, 20),
+        launchpadHistory: (state.launchpadHistory || []).slice(0, 50),
         cashLogs: (state.cashLogs || []).slice(0, 50),
         lastTimestamp: Date.now()
       };
@@ -5255,6 +5261,16 @@ function TradingGame() {
       detail: 'Cuan Launchpad'
     });
   };
+
+  const handleMemeRoundResult = useCallback((res) => {
+    if (!res) return;
+    const entry = {
+      id: `lp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: Date.now(),
+      ...res
+    };
+    setLaunchpadHistory((prev) => [entry, ...(prev || [])].slice(0, 50));
+  }, []);
 
   const openAdjustModal = (pos = null) => {
     const target = pos || modalPosition;
@@ -7930,6 +7946,7 @@ function TradingGame() {
             cash={cash}
             onPlaceBet={handleMemePlaceBet}
             onWinCash={handleMemeWinCash}
+            onRecordHistory={handleMemeRoundResult}
             formatMoney={formatMoney}
             t={t}
             language={language}
