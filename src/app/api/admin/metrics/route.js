@@ -427,6 +427,7 @@ export async function GET(request) {
       launchpadOverview: {
         totalRounds: allLaunchpadActivities.length,
         totalVolume: totalLaunchpadVolume,
+        totalProfit: totalLaunchpadProfit,
         totalProfitAwarded: totalLaunchpadProfit,
         highestMultiplier: highestLaunchpadMultiplier
       }
