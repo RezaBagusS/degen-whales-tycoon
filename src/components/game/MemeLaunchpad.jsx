@@ -442,7 +442,7 @@ export default function MemeLaunchpad({
         </div>
 
         {/* Recent Crashes Badge Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-none flex-nowrap pr-2">
           <span className="text-[10px] font-mono text-slate-500 shrink-0 mr-1 hidden sm:inline">
             {t.memeLastCrashes || 'Riwayat:'}
           </span>
@@ -647,14 +647,14 @@ export default function MemeLaunchpad({
               </div>
 
               {/* Quick Presets */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {[1, 5, 25].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     disabled={gameState === 'FLYING' && isApedIn}
                     onClick={() => handleSetBet(amt)}
-                    className="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-300 cursor-pointer transition-all disabled:opacity-50"
+                    className="px-2 sm:px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-300 cursor-pointer transition-all disabled:opacity-50"
                   >
                     ${amt}
                   </button>
@@ -663,7 +663,7 @@ export default function MemeLaunchpad({
                   type="button"
                   disabled={gameState === 'FLYING' && isApedIn}
                   onClick={() => handleSetBet(cash * 0.5)}
-                  className="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-amber-400 cursor-pointer transition-all disabled:opacity-50"
+                  className="px-2 sm:px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-amber-400 cursor-pointer transition-all disabled:opacity-50"
                 >
                   50%
                 </button>
@@ -674,7 +674,7 @@ export default function MemeLaunchpad({
                     const maxAllowed = Math.floor(cash * 100) / 100;
                     setBetAmount(Math.max(0.1, maxAllowed));
                   }}
-                  className="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-300 border border-slate-700 cursor-pointer transition-all disabled:opacity-50"
+                  className="px-2 sm:px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-300 border border-slate-700 cursor-pointer transition-all disabled:opacity-50"
                 >
                   MAX
                 </button>

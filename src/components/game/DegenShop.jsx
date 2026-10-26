@@ -246,28 +246,28 @@ export const DegenShop = ({
                 return (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-xl border border-slate-800 bg-[#0E1422] flex items-center justify-between gap-3 transition-all hover:border-slate-700"
+                    className="p-3 sm:p-3.5 rounded-xl border border-slate-800 bg-[#0E1422] flex items-center justify-between gap-2.5 sm:gap-3 transition-all hover:border-slate-700"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shrink-0">
-                        <IconComp className="w-5 h-5 text-slate-300" />
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shrink-0">
+                        <IconComp className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-white truncate">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <h4 className="text-xs font-bold text-white line-clamp-1">
                             {(t.upgrades?.[item.id]?.name) || item.name}
                           </h4>
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">
+                          <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[9px] sm:text-[10px] font-mono text-slate-300 border border-slate-700 shrink-0">
                             Lv.{lvl}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 line-clamp-1">
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-1 leading-snug">
                           {(t.upgrades?.[item.id]?.desc) || item.desc}
                         </p>
-                        <div className="text-[11px] font-mono text-emerald-400 mt-0.5">
+                        <div className="text-[10px] sm:text-[11px] font-mono text-emerald-400 mt-0.5">
                           +{formatMoney(itemDps)}/s{' '}
                           {lvl > 0 && (
-                            <span className="text-slate-400 text-[10px]">
+                            <span className="text-slate-400 text-[9px] sm:text-[10px]">
                               (Total: {formatMoney(itemDps * lvl)}/s)
                             </span>
                           )}

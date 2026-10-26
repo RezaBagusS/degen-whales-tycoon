@@ -5869,37 +5869,40 @@ function TradingGame() {
       )}
 
       {activeEvent && (
-        <div className="bg-gradient-to-r from-rose-950 via-amber-950 to-slate-950 border-b border-amber-500/50 px-4 py-2.5 relative z-[25] shadow-lg">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="px-2 py-0.5 rounded bg-red-500 text-white font-mono text-xs font-extrabold animate-ping">
+        <div className="bg-gradient-to-r from-rose-950 via-amber-950 to-slate-950 border-b border-amber-500/50 px-3 sm:px-4 py-2 sm:py-2.5 relative z-[25] shadow-lg">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-mono text-[10px] font-extrabold tracking-wider shrink-0 mt-0.5 flex items-center gap-1 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 ACTIVE
               </span>
-              <div>
-                <div className="text-xs sm:text-sm font-extrabold text-amber-300 flex items-center gap-2">
-                  <span>{activeEvent.title}</span>
-                  <span className="px-2 py-0.5 rounded bg-black/40 text-white font-mono text-xs border border-white/20">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="text-xs sm:text-sm font-extrabold text-amber-300 leading-snug">
+                    {activeEvent.title}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-black/50 text-white font-mono text-[10px] sm:text-xs font-bold border border-white/20 shrink-0">
                     ⏱️ {activeEvent.timer}{t.leftSec || 's tersisa'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-200 mt-0.5">{activeEvent.desc}</div>
+                <div className="text-[11px] text-slate-200 mt-1 leading-snug">{activeEvent.desc}</div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
               {activeEvent.type === 'HACK' ? (
                 <button
                   onClick={handleSaveColdWallet}
-                  className="px-4 py-1.5 rounded-lg bg-[#FF3366] hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg shadow-rose-500/30 animate-pulse cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#FF3366] hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg shadow-rose-500/30 animate-pulse cursor-pointer"
                 >
                   🛡️ {t.withdrawColdWallet || 'WITHDRAW KE COLD WALLET'} ({activeEvent.timer}s)
                 </button>
               ) : activeEvent.type === 'SEC_CRACKDOWN' ? (
-                <span className="px-3 py-1 rounded-lg bg-rose-500/20 border border-[#FF3366] text-[#FF3366] font-mono text-xs font-bold">
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-[#FF3366] text-[#FF3366] font-mono text-[11px] sm:text-xs font-bold">
                   ❄️ {t.bearMarketBanner || 'BEAR MARKET -55% DPS'} ({Math.ceil(bearMarketLeft)}s)
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-lg bg-emerald-500/20 border border-[#00FF88] text-[#00FF88] font-mono text-xs font-bold">
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-[#00FF88] text-[#00FF88] font-mono text-[11px] sm:text-xs font-bold">
                   🔥 {t.bullRunBanner || '5x PROFIT AKTIF'} ({Math.ceil(bullRunLeft)}s)
                 </span>
               )}
@@ -5910,12 +5913,12 @@ function TradingGame() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4 sm:gap-5">
         {/* 1. Main Mode Navigation Bar (Perps Futures, Meme Launchpad, Shop) */}
-        <div className="flex items-center gap-1.5 p-1 bg-[#090D15] rounded-xl border border-slate-800/80 w-fit">
+        <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-[#090D15] rounded-xl border border-slate-800/80 w-full sm:w-fit overflow-x-auto scrollbar-none">
           <button
             type="button"
             data-testid="mode-perps"
             onClick={() => setTradingMode('perps')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
               tradingMode === 'perps'
                 ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
@@ -5929,7 +5932,7 @@ function TradingGame() {
             type="button"
             data-testid="mode-launchpad"
             onClick={() => setTradingMode('launchpad')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
               tradingMode === 'launchpad'
                 ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
@@ -5952,7 +5955,7 @@ function TradingGame() {
             type="button"
             data-testid="mode-shop"
             onClick={() => setTradingMode('shop')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
               tradingMode === 'shop'
                 ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
@@ -7910,12 +7913,12 @@ function TradingGame() {
                   </div>
 
                   {/* Filter Pills */}
-                  <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-bold">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold scrollbar-none flex-nowrap">
                     {[
-                      { id: 'all', label: 'Semua Mutasi' },
-                      { id: 'trade', label: 'Trade' },
-                      { id: 'income', label: 'Pemasukan (+)' },
-                      { id: 'expense', label: 'Pengeluaran (-)' },
+                      { id: 'all', label: 'Semua', fullLabel: 'Semua Mutasi' },
+                      { id: 'trade', label: 'Trade', fullLabel: 'Trade' },
+                      { id: 'income', label: 'Masuk (+)', fullLabel: 'Pemasukan (+)' },
+                      { id: 'expense', label: 'Keluar (-)', fullLabel: 'Pengeluaran (-)' },
                     ].map((f) => (
                       <button
                         key={f.id}
@@ -7927,7 +7930,8 @@ function TradingGame() {
                             : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent'
                         }`}
                       >
-                        {f.label}
+                        <span className="sm:hidden">{f.label}</span>
+                        <span className="hidden sm:inline">{f.fullLabel}</span>
                       </button>
                     ))}
                   </div>
@@ -7948,18 +7952,18 @@ function TradingGame() {
                             key={log.id}
                             className="p-2.5 rounded-xl bg-[#111622] hover:bg-[#161d2d] border border-slate-800 transition-colors flex items-center justify-between text-xs font-mono gap-2"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                                 isPositive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                               }`}>
                                 {renderLogIcon(log)}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-white font-bold text-xs truncate max-w-[150px] sm:max-w-[200px]">
+                                  <span className="text-white font-bold text-xs truncate max-w-[200px] sm:max-w-[320px]">
                                     {log.title}
                                   </span>
-                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${badge.color}`}>
+                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${badge.color}`}>
                                     {badge.label}
                                   </span>
                                 </div>
