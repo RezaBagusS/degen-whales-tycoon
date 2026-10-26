@@ -14,6 +14,29 @@ function verifyAdmin(request) {
   return provided && provided.trim() === secret.trim();
 }
 
+let schemaEnsured = false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isBanned" BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "banReason" TEXT;
+      CREATE TABLE IF NOT EXISTS "BroadcastAnnouncement" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "message" TEXT NOT NULL,
+        "type" TEXT NOT NULL DEFAULT 'info',
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "expiresAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    schemaEnsured = true;
+  } catch (err) {
+    console.warn('Auto schema ensure notice:', err.message);
+  }
+}
+
 export async function GET(request) {
   const startReq = performance.now();
 
@@ -22,6 +45,9 @@ export async function GET(request) {
   }
 
   try {
+    // Ensure all columns and tables exist in DB (e.g. on new production branches)
+    await ensureSchema();
+
     const url = new URL(request.url);
     const searchParams = url.searchParams;
 
@@ -43,41 +69,94 @@ export async function GET(request) {
 
     // 1. Measure DB ping latency
     const dbStart = performance.now();
-    await prisma.$queryRaw`SELECT 1`;
-    const dbLatencyMs = Math.round(performance.now() - dbStart);
+    let dbLatencyMs = 0;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbLatencyMs = Math.round(performance.now() - dbStart);
+    } catch {
+      dbLatencyMs = 999;
+    }
 
     // 2. Overview Counts & Aggregates (Real-time Online vs 24h Active)
-    const [totalUsers, activeUsersNow, activeUsers24h, aggStats] = await Promise.all([
-      prisma.user.count(),
-      prisma.gameSave.count({
-        where: {
-          updatedAt: { gte: fiveMinutesAgo }
-        }
-      }),
-      prisma.gameSave.count({
-        where: {
-          updatedAt: { gte: twentyFourHoursAgo }
-        }
-      }),
-      prisma.gameSave.aggregate({
-        _sum: {
-          cash: true,
-          peakNetWorth: true,
-          whaleTokens: true
-        }
-      })
-    ]);
+    let totalUsers = 0;
+    let activeUsersNow = 0;
+    let activeUsers24h = 0;
+    let aggStats = { _sum: { cash: 0, peakNetWorth: 0, whaleTokens: 0 } };
+
+    try {
+      const [uCount, nowCount, dayCount, sumStats] = await Promise.all([
+        prisma.user.count(),
+        prisma.gameSave.count({
+          where: {
+            updatedAt: { gte: fiveMinutesAgo }
+          }
+        }),
+        prisma.gameSave.count({
+          where: {
+            updatedAt: { gte: twentyFourHoursAgo }
+          }
+        }),
+        prisma.gameSave.aggregate({
+          _sum: {
+            cash: true,
+            peakNetWorth: true,
+            whaleTokens: true
+          }
+        })
+      ]);
+      totalUsers = uCount;
+      activeUsersNow = nowCount;
+      activeUsers24h = dayCount;
+      aggStats = sumStats;
+    } catch (aggErr) {
+      console.warn('Overview aggregates query notice:', aggErr.message);
+    }
 
     // 3. Fetch All Users with GameSaves for complete aggregation
-    const users = await prisma.user.findMany({
-      include: {
-        save: true,
-        syndicate: true
-      },
-      orderBy: {
-        updatedAt: 'desc'
+    let users = [];
+    try {
+      users = await prisma.user.findMany({
+        include: {
+          save: true,
+          syndicate: true
+        },
+        orderBy: {
+          updatedAt: 'desc'
+        }
+      });
+    } catch (usersErr) {
+      console.warn('User findMany full relation failed, using raw query fallback:', usersErr.message);
+      try {
+        const rawUsers = await prisma.$queryRaw`
+          SELECT u.id, u.username, u.email, u."walletAddress", u."createdAt", u."updatedAt"
+          FROM "User" u
+          ORDER BY u."updatedAt" DESC
+        `;
+        const rawSaves = await prisma.$queryRaw`
+          SELECT * FROM "GameSave"
+        `;
+        const saveMap = new Map();
+        if (Array.isArray(rawSaves)) {
+          for (const s of rawSaves) {
+            saveMap.set(s.userId, s);
+          }
+        }
+        users = (Array.isArray(rawUsers) ? rawUsers : []).map(u => ({
+          ...u,
+          isBanned: false,
+          banReason: null,
+          save: saveMap.get(u.id) || null,
+          syndicate: null
+        }));
+      } catch (rawErr) {
+        console.error('User raw query fallback failed:', rawErr.message);
+        users = [];
       }
-    });
+    }
+
+    if (totalUsers === 0 && users.length > 0) {
+      totalUsers = users.length;
+    }
 
     const allActivePositions = [];
     const allRecentTrades = [];
@@ -86,7 +165,7 @@ export async function GET(request) {
       const save = u.save;
       const history = Array.isArray(save?.tradeHistory) ? save.tradeHistory : [];
       const lastActiveDate = save?.lastSavedAt ? new Date(save.lastSavedAt) : (u.updatedAt ? new Date(u.updatedAt) : new Date(u.createdAt));
-      const lastActiveMs = lastActiveDate ? lastActiveDate.getTime() : 0;
+      const lastActiveMs = (lastActiveDate && !isNaN(lastActiveDate.getTime())) ? lastActiveDate.getTime() : 0;
       
       const isOnline = lastActiveMs > 0 && (now - lastActiveMs <= 5 * 60 * 1000);
       const isActive24h = lastActiveMs > 0 && (now - lastActiveMs <= 24 * 60 * 60 * 1000);
@@ -129,7 +208,7 @@ export async function GET(request) {
         email: u.email || null,
         walletAddress: u.walletAddress,
         createdAt: u.createdAt,
-        lastActive: lastActiveDate.toISOString(),
+        lastActive: (lastActiveDate && !isNaN(lastActiveDate.getTime())) ? lastActiveDate.toISOString() : new Date().toISOString(),
         isOnline,
         isActive24h,
         isBanned: Boolean(u.isBanned),
@@ -192,13 +271,13 @@ export async function GET(request) {
       // Players active in this hour
       const activeInHour = allPlayerList.filter(p => {
         const t = new Date(p.lastActive).getTime();
-        return t >= bucketStart.getTime() && t < bucketEnd.getTime();
+        return !isNaN(t) && t >= bucketStart.getTime() && t < bucketEnd.getTime();
       }).length;
 
       // Trades in this hour
       const tradesInHour = allRecentTrades.filter(tr => {
         const t = new Date(tr.timestamp || 0).getTime();
-        return t >= bucketStart.getTime() && t < bucketEnd.getTime();
+        return !isNaN(t) && t >= bucketStart.getTime() && t < bucketEnd.getTime();
       });
 
       const volumeInHour = tradesInHour.reduce((acc, tr) => acc + Math.abs(tr.pnl || 0), 0);
@@ -212,10 +291,15 @@ export async function GET(request) {
     }
 
     // Active broadcast announcement
-    const activeBroadcast = await prisma.broadcastAnnouncement.findFirst({
-      where: { isActive: true },
-      orderBy: { updatedAt: 'desc' }
-    });
+    let activeBroadcast = null;
+    try {
+      activeBroadcast = await prisma.broadcastAnnouncement.findFirst({
+        where: { isActive: true },
+        orderBy: { updatedAt: 'desc' }
+      });
+    } catch {
+      activeBroadcast = null;
+    }
 
     // APM metrics
     const apm = telemetry.getMetrics();

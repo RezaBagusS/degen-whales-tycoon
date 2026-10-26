@@ -16,7 +16,7 @@ export async function GET() {
       broadcast: broadcast || null
     });
   } catch (err) {
-    console.error('Error fetching broadcast announcement:', err);
-    return NextResponse.json({ success: false, error: 'Gagal memuat pengumuman' }, { status: 500 });
+    console.warn('Notice fetching broadcast announcement (table might be initializing):', err.message);
+    return NextResponse.json({ success: true, active: false, broadcast: null });
   }
 }

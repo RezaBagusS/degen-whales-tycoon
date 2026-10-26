@@ -979,12 +979,16 @@ function loadGame() {
     const peak = finiteNonnegative(saved.peakNetWorth, 10);
     const location = [...LOCATION_TIERS].reverse().find(t =>
       peak >= t.reqNetWorth && tokens >= t.reqWhaleTokens) || LOCATION_TIERS[0];
+    const MIN_OFFLINE_SECONDS = 30; // Minimum 30 seconds away to trigger offline earnings
+    const lastDismissTs = finiteNonnegative(saved.lastOfflineDismissTs, 0);
+    const isCooldownActive = lastDismissTs > 0 && ((Date.now() - lastDismissTs) / 1000) < 45;
+
     const seconds = Math.min(MAX_OFFLINE_SECONDS, Math.max(0,
       (Date.now() - finiteNonnegative(saved.lastTimestamp, Date.now())) / 1000));
     const whaleDividend = tokens * 5.0;
     const dps = (PASSIVE_UPGRADES.reduce((sum, u) => sum + levels[u.id] * u.baseDps, 0)
       * (1 + tokens * 0.5) * (1 - location.upkeepRate)) + whaleDividend;
-    const earned = finiteNonnegative(seconds >= 5 ? seconds * dps : 0);
+    const earned = finiteNonnegative((!isCooldownActive && seconds >= MIN_OFFLINE_SECONDS) ? seconds * dps : 0);
     const prices = MARKET_PAIRS.map((p, i) =>
       Math.max(0.00001, finiteNonnegative(saved.marketPrices?.[i], p.basePrice)));
     let pairIdx = Number.isInteger(saved.selectedPairIdx) &&
@@ -8527,6 +8531,18 @@ function TradingGame() {
                   pendingOfflineDoublerRef.current = { earned: extraEarned, seconds: offlineSecs };
                   setOfflineModal(null);
 
+                  // Commit to localStorage synchronously so tab switch or mobile freeze cannot resurrect modal
+                  try {
+                    const raw = localStorage.getItem(SAVE_KEY);
+                    if (raw) {
+                      const s = JSON.parse(raw);
+                      s.cash = finiteNonnegative(s.cash, 10) + extraEarned;
+                      s.lastTimestamp = Date.now();
+                      s.lastOfflineDismissTs = Date.now();
+                      localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+                    }
+                  } catch {}
+
                   if (ADS_CONFIG.mode === 'monetag' && ADS_CONFIG.monetag?.directLinkUrl) {
                     try {
                       window.open(ADS_CONFIG.monetag.directLinkUrl, '_blank', 'noopener,noreferrer');
@@ -8562,6 +8578,15 @@ function TradingGame() {
               <button
                 type="button"
                 onClick={() => {
+                  try {
+                    const raw = localStorage.getItem(SAVE_KEY);
+                    if (raw) {
+                      const s = JSON.parse(raw);
+                      s.lastTimestamp = Date.now();
+                      s.lastOfflineDismissTs = Date.now();
+                      localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+                    }
+                  } catch {}
                   addCashLog({
                     type: 'OFFLINE_PASSIVE',
                     category: 'income',
@@ -9070,6 +9095,16 @@ function TradingGame() {
             const extraEarned = pendingOfflineDoublerRef.current?.earned || offlineModal?.earned || 5;
             const offlineSecs = pendingOfflineDoublerRef.current?.seconds || offlineModal?.seconds || 0;
             setCash((prev) => prev + extraEarned);
+            try {
+              const raw = localStorage.getItem(SAVE_KEY);
+              if (raw) {
+                const s = JSON.parse(raw);
+                s.cash = finiteNonnegative(s.cash, 10) + extraEarned;
+                s.lastTimestamp = Date.now();
+                s.lastOfflineDismissTs = Date.now();
+                localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+              }
+            } catch {}
             addCashLog({
               type: 'OFFLINE_PASSIVE',
               category: 'income',

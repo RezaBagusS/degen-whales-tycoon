@@ -129,7 +129,7 @@ test('offline income is capped at 8 hours and is not awarded twice', async ({ pa
   expect(second.cash - first.cash).toBeLessThan(2);
 });
 
-test('clicking 2x profit on offline earnings doubles the profit and dismisses the modal immediately', async ({ page }) => {
+test('clicking 2x profit on offline earnings doubles the profit and dismisses the modal immediately without re-appearing on reload', async ({ page }) => {
   await start(page, { passiveLevels: { indikator: 1 }, lastTimestamp: Date.now() - 60000 });
   await expect(page.getByText('Bot & Kru Tetap Bekerja!')).toBeVisible();
   const initialCash = (await readSave(page)).cash;
@@ -142,6 +142,10 @@ test('clicking 2x profit on offline earnings doubles the profit and dismisses th
 
   // Cash must reflect the 2x doubled bonus
   await expect.poll(async () => cashValue(page)).toBeGreaterThan(initialCash);
+
+  // When returning or reloading (simulating return from ad), modal must NOT re-appear
+  await page.reload();
+  await expect(page.getByText('Bot & Kru Tetap Bekerja!')).toHaveCount(0);
 });
 
 test('hack timeout charges exactly once', async ({ page }) => {

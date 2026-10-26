@@ -10,12 +10,36 @@ function isAuthorized(request) {
   return (headerKey && headerKey === secretKey) || (queryKey && queryKey === secretKey);
 }
 
+let schemaEnsured = false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isBanned" BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "banReason" TEXT;
+      CREATE TABLE IF NOT EXISTS "BroadcastAnnouncement" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "message" TEXT NOT NULL,
+        "type" TEXT NOT NULL DEFAULT 'info',
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "expiresAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    schemaEnsured = true;
+  } catch (err) {
+    console.warn('Auto schema ensure notice:', err.message);
+  }
+}
+
 export async function POST(request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized: Admin Secret Key diperlukan' }, { status: 401 });
   }
 
   try {
+    await ensureSchema();
     const body = await request.json();
     const { action, userId } = body;
 
