@@ -85,13 +85,13 @@ export default function DailyStreakModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-gradient-to-b from-[#111622] via-[#0B0E14] to-[#07090E] border border-amber-500/40 rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-2xl relative overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      <div className="bg-gradient-to-b from-[#111622] via-[#0B0E14] to-[#07090E] border border-amber-500/30 rounded-2xl max-w-2xl w-full p-4 sm:p-5 shadow-2xl relative overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Background ambient lighting */}
         <div className="absolute -right-20 -top-20 w-52 h-52 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 w-52 h-52 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800 relative z-10 shrink-0">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 relative z-10 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/40 text-amber-400">
               <Flame className="w-5 h-5 animate-pulse" />
@@ -122,7 +122,7 @@ export default function DailyStreakModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="space-y-4 py-4 overflow-y-auto pr-0.5 flex-1 relative z-10 no-scrollbar">
+        <div className="space-y-3 py-3 overflow-y-auto pr-0.5 flex-1 relative z-10 no-scrollbar">
           {/* Streak Lost Alert Banner */}
           {isMissed && (
             <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-600/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs animate-in slide-in-from-top-2">
@@ -150,8 +150,8 @@ export default function DailyStreakModal({
             </div>
           )}
 
-          {/* 7 Days Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+          {/* 7 Days Balanced Proportional Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {DAILY_STREAK_REWARDS.map((item) => {
               const dayNum = item.day;
               const isPastClaimed = (statusInfo.status === 'claimed_today' && dayNum <= currentDay) ||
@@ -159,21 +159,104 @@ export default function DailyStreakModal({
               const isCurrentReady = statusInfo.status === 'ready_to_claim' && dayNum === currentDay;
               const isGrandDay = dayNum === 7;
 
+              if (isGrandDay) {
+                // Day 7: Featured 2-column wide card that balances the grid
+                return (
+                  <div
+                    key={item.day}
+                    className={`col-span-2 p-3 rounded-xl border relative transition-all flex flex-col justify-between ${
+                      isCurrentReady
+                        ? 'bg-gradient-to-br from-amber-950/50 via-slate-900 to-amber-900/30 border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-950/60'
+                        : isPastClaimed
+                        ? 'bg-slate-950/50 border-emerald-500/40 opacity-75'
+                        : 'bg-gradient-to-br from-amber-950/20 via-[#0B0E14] to-[#0D111A] border-amber-500/30 hover:border-amber-400/50'
+                    }`}
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between gap-1 w-full mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-[9px] font-mono font-black px-2 py-0.5 rounded ${
+                            isCurrentReady
+                              ? 'bg-amber-400 text-slate-950 shadow-sm'
+                              : isPastClaimed
+                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          {item.badgeText}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-400/80 font-mono">
+                          HARI 7
+                        </span>
+                      </div>
+
+                      {isPastClaimed ? (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>KLAIM</span>
+                        </span>
+                      ) : isCurrentReady ? (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-300 font-bold animate-pulse">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>HARI INI</span>
+                        </span>
+                      ) : (
+                        <Lock className="w-3.5 h-3.5 text-slate-600" />
+                      )}
+                    </div>
+
+                    {/* Featured Body */}
+                    <div className="flex items-center gap-3 my-1.5 py-1">
+                      <div
+                        className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-inner"
+                        style={{
+                          backgroundColor: `${item.color}20`,
+                          borderColor: `${item.color}60`,
+                          borderWidth: 1
+                        }}
+                      >
+                        {renderRewardIcon(item.iconName, 'w-6 h-6 text-amber-400')}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs sm:text-sm font-extrabold text-amber-300 leading-tight">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] font-mono font-semibold text-slate-200 mt-0.5">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grand Prize Footer Badge */}
+                    <div className="pt-1.5 border-t border-amber-500/20 flex items-center justify-between text-[9px] font-mono font-bold text-amber-400">
+                      <span className="flex items-center gap-1">
+                        <Award className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span>GELAR: DISCIPLINED DEGEN</span>
+                      </span>
+                      <span className="text-amber-300/80 uppercase">
+                        250X TICKET + 1 $WHALE
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Days 1 to 6: Proportional unified cards
               return (
                 <div
                   key={item.day}
-                  className={`p-3 rounded-xl border relative transition-all flex flex-col justify-between ${
-                    isGrandDay ? 'col-span-2 sm:col-span-3 md:col-span-1' : ''
-                  } ${
+                  className={`p-2.5 sm:p-3 rounded-xl border relative transition-all flex flex-col justify-between min-h-[142px] ${
                     isCurrentReady
                       ? 'bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-950 border-amber-400 ring-2 ring-amber-400/30 shadow-lg shadow-amber-950/50'
                       : isPastClaimed
                       ? 'bg-slate-950/40 border-emerald-500/30 opacity-70'
-                      : 'bg-[#0B0E14] border-slate-800'
+                      : 'bg-[#0B0E14] border-slate-800/90 hover:border-slate-700'
                   }`}
                 >
-                  {/* Top Badge */}
-                  <div className="flex items-center justify-between gap-1 mb-2">
+                  {/* Top Badge & Status */}
+                  <div className="flex items-center justify-between gap-1 w-full mb-1">
                     <span
                       className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
                         isCurrentReady
@@ -201,35 +284,36 @@ export default function DailyStreakModal({
                     )}
                   </div>
 
-                  {/* Reward Icon & Title */}
-                  <div className="text-center my-1.5">
+                  {/* Icon & Title */}
+                  <div className="text-center my-auto py-1">
                     <div
-                      className="w-10 h-10 rounded-xl mx-auto flex items-center justify-center mb-1.5 transition-transform"
+                      className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center mb-1.5 transition-transform"
                       style={{
                         backgroundColor: `${item.color}15`,
                         borderColor: `${item.color}40`,
                         borderWidth: 1
                       }}
                     >
-                      {renderRewardIcon(item.iconName, `w-5 h-5`)}
+                      {renderRewardIcon(item.iconName, 'w-4 h-4')}
                     </div>
                     <div className="text-xs font-bold text-white leading-tight">
                       {item.title}
                     </div>
-                    <div className="text-[11px] font-mono font-semibold text-slate-300 mt-0.5">
+                    <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-slate-300 mt-0.5 leading-snug">
                       {item.desc}
                     </div>
                   </div>
 
-                  {/* Grand prize indicator */}
-                  {isGrandDay && (
-                    <div className="mt-1 pt-1 border-t border-amber-500/20 text-center">
-                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-widest flex items-center justify-center gap-1">
-                        <Award className="w-2.5 h-2.5" />
-                        <span>Gelar Badge &amp; 250x</span>
-                      </span>
-                    </div>
-                  )}
+                  {/* Bottom Type indicator */}
+                  <div className="mt-1 pt-1 border-t border-slate-800/60 text-center">
+                    <span className="text-[9px] font-mono font-semibold text-slate-400 uppercase tracking-wider">
+                      {item.rewardType === 'cash'
+                        ? 'CASH REWARD'
+                        : item.rewardType === 'buff'
+                        ? 'TIMED BUFF'
+                        : 'TACTICAL ITEM'}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -237,10 +321,10 @@ export default function DailyStreakModal({
 
           {/* Guest / Anon Warning Banner */}
           {!currentUser && (
-            <div className="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span className="text-slate-300">
+                <span className="text-slate-300 text-[11px] sm:text-xs">
                   <strong className="text-white">Akun Tamu (Offline):</strong> Streak tersimpan di browser ini. Tautkan akun agar streak aman lintas perangkat!
                 </span>
               </div>
@@ -255,7 +339,7 @@ export default function DailyStreakModal({
         </div>
 
         {/* Modal Footer / Action Button */}
-        <div className="pt-3 border-t border-slate-800 relative z-10 shrink-0 space-y-2">
+        <div className="pt-3 border-t border-slate-800/80 relative z-10 shrink-0 space-y-2">
           {canClaim ? (
             <button
               onClick={() => onClaim(currentDay)}
@@ -265,11 +349,11 @@ export default function DailyStreakModal({
               <span>Klaim Hadiah Hari ke-{currentDay} Sekarang!</span>
             </button>
           ) : (
-            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
-              <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+              <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
+                <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 <span>Hadiah Hari ke-{statusInfo.nextDay} siap diklaim dalam:</span>
-                <span className="font-mono font-bold text-white text-sm ml-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                <span className="font-mono font-bold text-white text-sm bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                   {countdown}
                 </span>
               </div>
