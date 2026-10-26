@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/PLAY_NOW-degen--whales--tycoon.vercel.app-00FF88?style=for-the-badge&logo=vercel&logoColor=black)](https://degen-whales-tycoon.vercel.app)
-[![Version](https://img.shields.io/badge/version-1.5.0_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
+[![Version](https://img.shields.io/badge/version-1.6.0_Production-38BDF8?style=for-the-badge)](https://github.com/RezaBagusS/degen-whales-tycoon)
 [![License](https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js_16-Turbopack-white?style=for-the-badge&logo=next.js&logoColor=black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React_19-Client_Engine-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -29,7 +29,7 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 
 ## ⚡ Key Features
 
-### 🚀 1. Multi-Position Trading Engine (NEW v1.5.0)
+### 🚀 1. Multi-Position Trading Engine (v1.5.0)
 - **Up to 5 Concurrent Positions**: Trade simultaneously across multiple cryptocurrency pairs without locking your order execution form (`Slot Posisi: X/5`).
 - **Persistent Order Execution Form**: Place new LONG or SHORT orders at any time using available cash while existing positions continue to run in the background.
 - **Dedicated Open Positions Dashboard**:
@@ -53,7 +53,7 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 - **Realistic Slippage, Liquidation, & Volatility**: Simulated market orders, funding mechanics, closing taxes, and immediate liquidation alerts when margin falls below maintenance thresholds.
 - **Technical Analysis Suite**: Built-in EMA-20, EMA-50, EMA-200, Bollinger Bands, and interactive chart drawing tools (Trendlines, Horizontal Support/Resistance).
 
-### 🏭 2. Idle Tycoon Infrastructure & Mining Rigs
+### 🏭 3. Idle Tycoon Infrastructure & Mining Rigs
 - **10 Escalating Infrastructure Tiers**:
   1. *Indikator Garis Keramat* (Support/Resistance Chart Pen)
   2. *Grup VIP Sinyal 'Pasti Cuan'* (Paid Alpha Signals Channel)
@@ -68,38 +68,49 @@ You start with nothing but **$10.00 cash** in a crampy, dusty student room (*Kam
 - **Workstation Evolution**: Upgrade your real-estate from *Kamar Kos Sempit* to *Warnet VIP 24 Jam*, *Ruko Glodok*, *SCBD Penthouse Office*, up to an *Offshore Private Island*.
 - **Offline Earnings & 2x Multiplier**: Idle earnings continue accruing for up to 8 hours while you are away, with optional 2x doubler rewards.
 
-### 🕶️ 3. Black Market & Power-Ups
+### 🕶️ 4. Black Market & Power-Ups
 - **Whale Pump Whistle & Dump Horn**: Force temporary synthetic bull runs or massive market crashes on degen pairs.
 - **Liquidation Shield**: High-tech insurance that breaks upon liquidation to recover **85%** of your collateral.
 - **Insider Radar & Zero-Fee Passes**: Detect institutional order books and eliminate transaction fees for critical scalps.
 
-### 📊 4. Full Financial Ledger (Buku Kas Mutasi)
+### 📊 5. Full Financial Ledger (Buku Kas Mutasi)
 - Track **100% of your empire's cashflow** in real-time.
 - Instant financial summary cards: **Total Income (Masuk)**, **Total Expense (Keluar)**, and **Net Cashflow**.
 - Filter transactions by category: `Semua Mutasi`, `Trade`, `Pemasukan (+)`, and `Pengeluaran (-)`.
 
-### 🌐 5. Viral PnL Card Exporter
+### 🌐 6. Viral PnL Card Exporter
 - Export high-resolution (1200x675) Cyberpunk Bybit/Binance-style flex cards with one click.
 - Includes ROI percentages, dollar profits, entry prices, leverage badges, rank seals, and watermark links for social sharing.
 
-### 👑 6. Whale Syndicate Prestige Loop
+### 👑 7. Whale Syndicate Prestige Loop
 - Execute a **"Rugpull"** reset once your net worth reaches the required threshold.
 - Convert your temporary empire into permanent **Whale Tokens**.
 - Each Whale Token grants a **+0.50x global multiplier** and a **lifetime passive dividend of +$5.00/s** that persists across all future resets.
 
-### ☁️ 7. Player Accounts & Cross-Device Cloud Sync
+### ☁️ 8. Player Accounts & Cross-Device Cloud Sync
 - **Seamless Registration & Login**: Play anonymously as a guest or create a secure cloud account (`/auth`, `/login`, `/register`).
 - **PBKDF2 Native Security**: Zero-dependency password hashing with individual salt and HMAC-signed session cookies.
 - **Zero Progress Loss**: Full state fidelity backup (cash, upgrades, positions, ledger, drawings) saved into PostgreSQL.
 - **Instant Auto-Hydration**: Switching browsers, devices, or incognito windows automatically restores game progress without manual file imports.
 - **Dual-Database Branching**: Complete physical isolation between `dev` (development database branch) and `main` (production database branch) via Neon Serverless Postgres.
 
-### 🛰️ 8. Admin Ops Center & APM Telemetry (`/admin`)
-- **Visual Operations Dashboard**: Monitor the entire game platform in real time without touching the database via `/admin` (protected by `ADMIN_SECRET_KEY`).
-- **Whale Watcher & Player CRM**: Live table of all registered players, circulating cash, peak net worth, and workstation tiers.
-- **Live Risk & Leverage Monitor**: Real-time tracking of all active player positions, leverage brackets (50x, 100x, 250x), and liquidation distance.
-- **In-Memory Ring Buffer APM & Sentry Forwarder**: Built-in zero-dependency telemetry tracking runtime errors, API latencies (P50/P95), and database ping, with plug-and-play Sentry cloud integration (`SENTRY_DSN`).
-- **Live Global Trade Audit**: Real-time stream of recent realized trades, Take-Profits, and liquidations across all players.
+### 🛰️ 9. Admin Ops Center, Broadcast & Live Moderation Portal (NEW v1.6.0)
+- **Visual Operations Dashboard (`/admin`)**: Real-time management console protected by `ADMIN_SECRET_KEY` with key visibility toggle.
+- **Global In-Game Broadcast Engine (`/api/broadcast`, `/api/admin/broadcast`)**:
+  - Dispatch real-time server-wide announcements to all active players.
+  - Priority levels (`INFO`, `WARNING`, `EVENT`, `WHALE`) with dedicated styling and sound cues.
+  - Active toggle and custom expiration durations with auto-eviction.
+  - Dismissible floating banner rendered in-game across active sessions.
+- **Player CRM & Live Moderation (`/api/admin/player-action`)**:
+  - **Searchable Player Directory**: Debounced search query, pagination, and sorting by peak net worth, cash, and activity.
+  - **Account Ban / Unban**: Suspend disruptive accounts with custom reasons; instantly revokes active sessions and redirects client to `/auth?mode=login&banned=1`.
+  - **Clean Progress Reset**: Resets corrupted/exploited accounts cleanly back to initial **$10.00** starting cash and resets workstation to Kamar Kos. Clears persistent flags immediately and redirects cleanly to `/auth?mode=login&reset=1`, eliminating infinite reload loops.
+  - **Live Developer Compensation Engine**: Deliver real-time care packages containing currencies (Cash, Whale Tokens) and Black Market items (e.g., Whale Pump Whistle, Liquidation Shield) directly into player profiles without overwriting active autosaves. Displays an in-game dismissible notification banner (`data-testid="developer-compensation-banner"`) allowing players to acknowledge compensation smoothly.
+- **Real-Time APM & Telemetry**:
+  - **Active Players Now (5m)**: Real-time counter of concurrently connected players active in the last 5 minutes.
+  - **24-Hour Interactive Activity Trend**: Hourly distribution SVG area chart showing registration and active player trends.
+  - **In-Memory Ring Buffer APM**: Tracks runtime errors, database query latencies (P50/P95), and database ping status.
+  - **Export Player CSV**: One-click download of registered player directory for offline analytics.
 
 ---
 
@@ -136,9 +147,27 @@ cd degen-whales-tycoon
 
 # Install dependencies
 npm install
+
+# Copy environment template & configure secrets
+cp .env.example .env.local
+
+# Generate Prisma client & sync schema with PostgreSQL
+npm run db:generate
+npm run db:push
 ```
 
-### 2. Launch Development Server
+### 2. Environment Variables
+
+| Variable | Description | Default / Example |
+|---|---|---|
+| `DATABASE_URL` | Neon Serverless PostgreSQL connection string | `postgresql://user:pass@ep-...neon.tech/neondb` |
+| `NEXT_PUBLIC_APP_URL` | Canonical app URL for origin checks | `http://localhost:3000` |
+| `ADMIN_SECRET_KEY` | Secret bearer key protecting `/admin` and ops endpoints | Min 16 characters |
+| `SESSION_SECRET` | HMAC signing key for session cookies | Min 32 characters |
+| `SMTP_USER`, `SMTP_PASS` | Optional credentials for password reset mailer | `your-email@gmail.com` |
+| `SENTRY_DSN` | Optional Sentry DSN for production APM forwarding | `https://...@sentry.io/...` |
+
+### 3. Launch Development Server
 
 ```bash
 npm run dev

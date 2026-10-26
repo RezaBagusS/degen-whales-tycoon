@@ -2,9 +2,9 @@
 
 Dokumentasi game dan proyek Next.js
 
-- Versi game: **1.4.1**
-- Basis kode: **Degen & Whale Cloud Sync Edition**
-- Tanggal dokumentasi: **25 Oktober 2026**
+- Versi game: **1.6.0**
+- Basis kode: **Degen & Whale Ops, Broadcast & Live Management Edition**
+- Tanggal dokumentasi: **26 Oktober 2026**
 - Bahasa antarmuka: Indonesia & English
 - Genre: idle tycoon dan simulasi trading fiktif
 
@@ -31,6 +31,17 @@ Dokumentasi game dan proyek Next.js
 15. [Perbaikan yang sudah diterapkan](#15-perbaikan-yang-sudah-diterapkan)
 16. [Batasan dan troubleshooting](#16-batasan-dan-troubleshooting)
 17. [Arah pengembangan](#17-arah-pengembangan)
+18. [Sistem Misi & Tugas Likuiditas (Quest & Task System)](#18-sistem-misi--tugas-likuiditas-quest--task-system)
+19. [Optimasi Layout & Visualisasi Candlestick TradingView](#19-optimasi-layout--visualisasi-candlestick-tradingview)
+20. [Chart Responsive Dynamics & 3D Architectural Turntable Diorama](#20-chart-responsive-dynamics--3d-architectural-turntable-diorama)
+21. [Sound System & Audio FX Retro Cyberpunk (Web Audio API)](#21-sound-system--audio-fx-retro-cyberpunk-web-audio-api)
+22. [Sistem Multi-Bahasa Menyeluruh (Indonesia & English)](#22-sistem-multi-bahasa-menyeluruh-comprehensive-bilingual-i18n-indonesia--english)
+23. [Multi-Position Perpetual Trading Engine (v1.5.0)](#23-multi-position-perpetual-trading-engine-v150)
+24. [Cloud Sync Architecture, PBKDF2 Auth & Multi-Branch Database (v1.5.0)](#24-cloud-sync-architecture-pbkdf2-auth--multi-branch-database-v150)
+25. [Admin Operations Center & APM Telemetry (v1.6.0)](#25-admin-operations-center--apm-telemetry-v160)
+26. [Global In-Game Broadcast Engine (v1.6.0)](#26-global-in-game-broadcast-engine-v160)
+27. [Player Moderation, Clean Progress Reset & Live Developer Compensation (v1.6.0)](#27-player-moderation-clean-progress-reset--live-developer-compensation-v160)
+28. [Catatan Rilis & Changelog Versi](#28-catatan-rilis--changelog-versi)
 
 ## 1. Konsep dan tujuan
 
@@ -958,6 +969,128 @@ Game ini kini mendukung sistem multi-bahasa terpadu 100% dinamis untuk Bahasa In
 ### Kontrol Pengguna (Language Switcher UI)
 - **Header Quick Switcher**: Tombol pill cepat di navigasi atas (`🇮🇩 ID` dan `🇬🇧 EN`) dengan indikator neon aktif dan umpan balik suara klik.
 - **Pengaturan Modal**: Pilihan bahasa tersedia di dalam dialog Pengaturan Simulator (`Settings Modal`) lengkap dengan keterangan dwibahasa.
+
+## 23. Multi-Position Perpetual Trading Engine (v1.5.0)
+
+### Arsitektur Multi-Posisi
+Mendukung hingga 5 posisi aktif secara simultan (`activePositions: []`, slot maksimal 5) pada berbagai pasangan trading fiktif tanpa memblokir antarmuka trading.
+
+- **Form Eksekusi Tanpa Kunci**: Pemain dapat membuka posisi baru kapan saja menggunakan saldo cash yang tersedia tanpa menunggu posisi yang sedang berjalan ditutup.
+- **Dedicated Open Positions Dashboard**:
+  - Live card metrics: Direction (LONG/SHORT), Leverage, Pair symbol, Margin, Ukuran posisi, Harga likuidasi, Jarak persentase likuidasi, dan real-time PnL ($ dan %).
+  - **Binance Leverage Tier Brackets (`BINANCE_LEVERAGE_BRACKETS`)**: Batas ukuran posisi notional maksimum (250x: $100K, 100x: $250K, 50x: $1.00M, 10x: $10.0M, 2x: $50.0M) dengan badge tier aktif dan validasi form order.
+  - **Binance Margin Ratio Health Meter**: Rasio risiko margin pemeliharaan real-time ($\text{Margin Ratio} = \frac{\text{Maintenance Margin}}{\text{Position Equity}} \times 100\%$) dengan indikator visual dinamis (`Aman` <40%, `Waspada` 40-74%, `Bahaya Liq` ≥75%).
+  - **Pure Price ROI Badge**: Pemisahan jelas antara persentase pergerakan harga murni aset dan leveraged collateral ROI.
+  - **One-Click Chart Switch (`Buka Chart`)**: Lompat langsung ke canvas chart pasangan aset posisi terkait.
+  - **Quick TP/SL Modal Trigger**: Menyesuaikan target Take-Profit dan Stop-Loss kapan saja secara live.
+  - **One-Click Emergency Close All (`Tutup Semua Posisi`)**: Menutup seluruh posisi sekaligus saat 2 atau lebih posisi aktif berjalan.
+- **Multi-Position Canvas Overlay**: Menampilkan garis ENTRY, LIQ, TP, dan SL untuk seluruh posisi aktif pada pair yang sedang dilihat dengan navigator pills di sumbu harga.
+- **Independent Tick Evaluation**: Setiap posisi memantau harga pair-nya secara independen untuk eksekusi otomatis Take Profit, Stop Loss, dan Likuidasi.
+
+## 24. Cloud Sync Architecture, PBKDF2 Auth & Multi-Branch Database (v1.5.0)
+
+### Model Autentikasi Zero-Dependency
+- **Alur Akun**: Pemain dapat bermain anonim sebagai guest atau mendaftar akun cloud (`/auth`, `/api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`).
+- **PBKDF2 Native Security**: Hashing password menggunakan modul bawaan Node.js `crypto.pbkdf2Sync` (100,000 iterasi, SHA-512, salt unik 16-byte) tanpa dependensi eksternal berat seperti `bcrypt`.
+- **HMAC Session Cookies**: Cookie sesi terenkripsi dengan HMAC signature (`SESSION_SECRET`) dan proteksi `HttpOnly`, `SameSite=Lax`, serta flag `Secure` pada mode production.
+
+### Cloud Synchronization & State Fidelity
+- **Autosave Berkala (`/api/user/save`)**: Menyimpan snapshot progres lengkap (cash, peak net worth, upgrades, workstation, active positions, buku kas mutasi, inventory black market) ke database PostgreSQL.
+- **Auto-Restore (`/api/user/load`)**: Memulihkan progress secara otomatis saat berpindah perangkat, browser, atau tab penyamaran.
+- **Physical Multi-Branch Isolation**: Pemisahan tegas antara database cabang pengembangan (`dev`) dan cabang rilis (`main`) menggunakan Neon Serverless Postgres.
+
+## 25. Admin Operations Center & APM Telemetry (v1.6.0)
+
+### Visual Operations Dashboard (`/admin`)
+Portal terpusat untuk memantau kesehatan sistem game, aktivitas pemain, dan metrik ekonomi tanpa perlu query database manual. Dilindungi otentikasi `ADMIN_SECRET_KEY` melalui header `x-admin-key`.
+
+### Metrik Real-Time & APM
+1. **Active Players Now (5 Menit)**:
+   - Menghitung jumlah pemain unik yang melakukan sinkronisasi save atau heartbeat dalam jendela geser 5 menit terakhir via endpoint `/api/admin/metrics`.
+2. **Interactive 24-Hour Activity Trend (SVG Area Chart)**:
+   - Visualisasi tren per jam interaktif yang menampilkan distribusi pemain aktif dan registrasi akun baru dalam 24 jam terakhir.
+3. **In-Memory Ring Buffer APM**:
+   - Memantau latensi API internal (P50 dan P95), ping database PostgreSQL, dan log error runtime secara real-time.
+   - Dilengkapi forwarder opsional ke Sentry cloud (`SENTRY_DSN`).
+4. **Pencarian Pemain Ter-debounce & Paginasi Anti-Glitch**:
+   - Direktori pemain dilengkapi input pencarian dengan debounce 300ms, filter workstation, serta sistem paginasi 10 pemain per halaman yang stabil tanpa glitch pergeseran layout.
+5. **Ekspor Data Pemain (CSV Export)**:
+   - Tombol satu klik untuk mengunduh seluruh data pemain terdaftar dalam format file `.csv`.
+
+## 26. Global In-Game Broadcast Engine (v1.6.0)
+
+Sistem pengumuman siaran langsung server-wide yang memungkinkan administrator mengirim pesan real-time ke seluruh pemain yang sedang aktif.
+
+### Arsitektur Endpoint API
+- **`GET /api/broadcast`**: Mengambil pengumuman aktif terkini yang belum kedaluwarsa untuk dikonsumsi oleh in-game client (`Game.jsx`).
+- **`GET /api/admin/broadcast`**: Mengambil daftar seluruh riwayat pengumuman broadcast yang pernah dibuat untuk audit admin.
+- **`POST /api/admin/broadcast`**: Membuat pengumuman baru atau memperbarui status pengumuman broadcast.
+
+### Spesifikasi Fitur Broadcast
+- **Level Prioritas**:
+  - `INFO`: Informasi umum pembaruan atau tips trading (warna biru cerah / cyan).
+  - `WARNING`: Peringatan maintenance atau potensi volatilitas ekstrem (warna kuning / amber).
+  - `EVENT`: Pengumuman event komunitas, turnamen trading, atau airdrop (warna hijau / emerald).
+  - `WHALE`: Peringatan pergerakan pasar paus kripto skala besar (warna ungu / violet).
+- **Durasi & Auto-Expiration**: Pengumuman dapat diatur dengan masa berlaku (misal: 1 jam, 6 jam, 24 jam, atau permanen).
+- **Banner In-Game Dismissible**: Muncul di bagian atas terminal trading secara elegan dan dapat ditutup (*dismissed*) oleh pemain kapan saja tanpa mengganggu interaksi grafik.
+
+## 27. Player Moderation, Clean Progress Reset & Live Developer Compensation (v1.6.0)
+
+Endpoint aksi terpadu `/api/admin/player-action` menyediakan kontrol moderasi dan operasional langsung terhadap akun pemain.
+
+### 1. Akun Suspend & Unban
+- Admin dapat menonaktifkan akun yang melanggar aturan dengan menyertakan alasan ban kustom.
+- Saat akun di-ban, token sesi langsung dicabut dan panggilan API berikutnya mengarahkan klien ke `/auth?mode=login&banned=1`.
+- Admin dapat membuka kembali status suspend (*Unban*) dengan satu klik.
+
+### 2. Clean Progress Reset (Saldo Awal $10.00)
+- Menangani akun yang mengalami korupsi data penyimpanan lokal atau permintaan reset progres pemain.
+- **Mereset ke Modal Awal**: Saldo cash dan peak net worth di-reset persis ke nilai default permainan yaitu **$10.00**, workstation kembali ke *Kamar Kos Sempit*, upgrade di-reset ke level 0, dan seluruh posisi trading aktif ditutup.
+- **Pembersihan Flag & Anti-Infinite Reload Loop**:
+  - Flag `resetRequested: true` di database langsung dihapus seketika pada siklus deteksi pertama di `/api/user/save`, `/api/user/load`, dan `/api/auth/me`.
+  - Cookie autentikasi dihapus di response header (`Max-Age=0`).
+  - Klien membersihkan storage lokal kembali ke anonim, lalu dialihkan secara bersih ke `/auth?mode=login&reset=1`.
+  - Mengeliminasi bug reload berulang (layar kelap-kelip) yang sebelumnya terjadi jika flag reset tidak segera di-clear.
+
+### 3. Live Developer Compensation Engine
+- Memungkinkan admin memberikan paket ganti rugi atau apresiasi langsung ke pemain tanpa mengganggu progres bermain yang sedang berjalan.
+- **Dukungan Aset Kompensasi**:
+  - Mata uang game: Saldo cash tambahan dan Whale Token.
+  - Item Black Market: Whale Pump Whistle, Whale Dump Horn, Liquidation Shield, Insider Trading Radar, dan Zero-Fee Scalp Pass.
+- **Non-Overwriting Autosave Merge**:
+  - Kompensasi disimpan dalam antrean `pendingCompensation` di database.
+  - Saat autosave berikutnya berjalan, server menggabungkan item dan saldo secara aditif ke dalam save payload pemain tanpa menimpa data permainan yang baru.
+- **In-Game Dismissible Compensation Banner**:
+  - Pemain yang menerima kompensasi mendapatkan banner notifikasi khusus di dalam game (`data-testid="developer-compensation-banner"`).
+  - Banner menampilkan rincian cash, token, dan item yang diterima serta tombol tutup/klaim manual yang responsif.
+
+## 28. Catatan Rilis & Changelog Versi
+
+### Versi 1.6.0 (26 Oktober 2026) — Ops, Broadcast & Live Management
+- **Fitur Baru**:
+  - Portal Admin Ops Center v2 (`/admin`) dengan visualisasi telemetri lengkap.
+  - Global In-Game Broadcast announcement banner (`/api/broadcast`, `/api/admin/broadcast`).
+  - Player Moderation & Ops CRM (`/api/admin/player-action`) dengan fitur Ban/Unban.
+  - Clean Progress Reset ke modal awal $10.00 dengan eliminasi total infinite reload loop bug.
+  - Live Developer Compensation Engine dengan non-overwriting autosave merge dan in-game dismissible notification banner (`data-testid="developer-compensation-banner"`).
+  - Real-time Active Players Now metric (5-minute sliding window) dan interactive 24-hour hourly trend SVG chart.
+  - Debounced player directory search, pagination anti-glitch, dan ekspor CSV.
+- **Infrastruktur & Lingkungan**:
+  - Standardisasi skrip database di `package.json` (`npm run db:push` dan `npm run db:generate`).
+  - Validasi keselarasan skema Neon Serverless PostgreSQL production.
+  - Dokumentasi variabel lingkungan produksi di `.env.example` dan `README.md`.
+
+### Versi 1.5.0 (25 Oktober 2026) — Multi-Position Trading & Cloud Sync
+- Multi-Position Perpetual Trading Engine hingga 5 posisi simultan.
+- Autentikasi akun PBKDF2 native dan sinkronisasi cloud save PostgreSQL.
+- Sentry APM integration dan in-memory ring buffer telemetry.
+
+### Versi 1.4.1 (25 Oktober 2026) — Quests & Layout Optimization
+- Sistem Misi & Tugas Likuiditas bertingkat (Milestone Onboarding & Daily Quests).
+- Optimasi layout TradingView, pembatasan tinggi panel samping, dan candlestick timer.
+- 3D diorama turntable arsitektur markas.
+- Web Audio API synthesizer murni dan lokalisasi dwibahasa (ID/EN).
 
 ## Referensi
 
