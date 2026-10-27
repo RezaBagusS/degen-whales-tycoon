@@ -966,7 +966,8 @@ function loadGame() {
     inventory: { pump_whistle: 0, dump_horn: 0, liq_shield: 0, leverage_250x: 0, zero_fee: 0, insider_radar: 0 },
     activeEffects: { zeroFeeUntil: 0, has250xTicket: false, radarUntil: 0 },
     dailyWhaleUsage: { lastWhistleDate: null, lastDumpDate: null },
-    dailyStreak: { streakCount: 0, currentDay: 1, lastClaimDate: null, lastClaimTime: 0, freezeUsed: false, badgeUnlocked: false }
+    dailyStreak: { streakCount: 0, currentDay: 1, lastClaimDate: null, lastClaimTime: 0, freezeUsed: false, badgeUnlocked: false },
+    shillerBadgeUnlocked: false
   };
   const initialAnchor = fresh.marketPrices[0] || MARKET_PAIRS[0].basePrice;
   fresh.candlesticksByTf = generateSynchronousCandlesForPair(0, initialAnchor);
@@ -1110,6 +1111,7 @@ function loadGame() {
         freezeUsed: Boolean(saved.dailyStreak.freezeUsed),
         badgeUnlocked: Boolean(saved.dailyStreak.badgeUnlocked)
       } : { ...fresh.dailyStreak },
+      shillerBadgeUnlocked: Boolean(saved.shillerBadgeUnlocked),
       cash: finiteNonnegative(saved.cash, 10) + earned,
       peakNetWorth: peak, whaleTokens: tokens, passiveLevels: levels,
       lastDailyClaim: Math.min(Date.now(), finiteNonnegative(saved.lastDailyClaim)),
@@ -1437,6 +1439,8 @@ function TradingGame() {
   const [mousePos, setMousePos] = useState({ x: null, y: null });
 
   const [showPnlModal, setShowPnlModal] = useState(false);
+  const [selectedPnlTrade, setSelectedPnlTrade] = useState(null);
+  const [shillerBadgeUnlocked, setShillerBadgeUnlocked] = useState(Boolean(initial.shillerBadgeUnlocked));
   const [showPrestigeModal, setShowPrestigeModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showWorkstationGallery, setShowWorkstationGallery] = useState(false);
@@ -3279,7 +3283,7 @@ function TradingGame() {
       tradeHistory, launchpadHistory, cashLogs, lastDailyClaim, lastWhaleFaucetClaim, lastCashAdClaim, selectedPairIdx, selectedTfIdx,
       bullRunLeft, bearMarketLeft, activeEvent, liquidationAlert, currentDps,
       currentLocation, claimedMilestones, questStats, dailyQuestState,
-      inventory, activeEffects, dailyWhaleUsage, dailyStreak
+      inventory, activeEffects, dailyWhaleUsage, dailyStreak, shillerBadgeUnlocked
     };
   });
 
@@ -5086,6 +5090,27 @@ function TradingGame() {
     handleClaimDailyStreak(dailyStreak.currentDay || 1);
   };
 
+  const handleOpenPnlModal = useCallback((tradeObj = null) => {
+    setSelectedPnlTrade(tradeObj);
+    setShowPnlModal(true);
+  }, []);
+
+  const handleClaimShillerReward = useCallback(() => {
+    if (shillerBadgeUnlocked) return;
+    setShillerBadgeUnlocked(true);
+    const rewardAmount = 100.0;
+    setCash((c) => c + rewardAmount);
+    playProfitSound();
+    addCashLog({
+      type: 'ACHIEVEMENT',
+      category: 'achievement',
+      title: 'Gelar: 📢 Certified Shiller',
+      amount: rewardAmount,
+      detail: 'Bonus share kartu PnL pertama ke media sosial'
+    });
+    triggerToast('🎉 ACHIEVEMENT DIBUKA: 📢 Certified Shiller! Bonus +$100.00 Cash masuk kas!', 'success');
+  }, [shillerBadgeUnlocked, playProfitSound, triggerToast, addCashLog]);
+
   const WHALE_FAUCET_COOLDOWN_MS = 180 * 1000; // 3 menit
   const whaleFaucetAmount = Math.max(10, (whaleTokens || 1) * 10);
   const isWhaleFaucetCoolingDown = Date.now() - lastWhaleFaucetClaim < WHALE_FAUCET_COOLDOWN_MS;
@@ -5663,6 +5688,8 @@ function TradingGame() {
     candlesticksByTfRef.current = {};
     setCandlesticksByTf({});
     setShowPnlModal(false);
+    setSelectedPnlTrade(null);
+    setShillerBadgeUnlocked(false);
     setShowPrestigeModal(false);
     setActiveTab('infra');
     setConfirmReset(false);
@@ -5757,11 +5784,17 @@ function TradingGame() {
 
             <button
               data-testid="btn-share-pnl"
-              onClick={() => setShowPnlModal(true)}
-              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-[#00FF88]/15 hover:bg-[#00FF88]/25 text-[#00FF88] border border-[#00FF88]/40 transition-all cursor-pointer"
+              onClick={() => handleOpenPnlModal(activePosition || (tradeHistory.length > 0 ? tradeHistory[0] : null))}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-[#00FF88]/15 hover:bg-[#00FF88]/25 text-[#00FF88] border border-[#00FF88]/40 transition-all cursor-pointer relative"
+              title="📸 Pamer Kartu PnL ke Sosmed (Threads & X)"
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t.sharePnl || 'Cetak PnL'}</span>
+              <span className="hidden sm:inline">{t.sharePnl || 'Flex PnL'}</span>
+              {!shillerBadgeUnlocked && (
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-slate-950 font-mono animate-pulse">
+                  +$100
+                </span>
+              )}
             </button>
 
             {/* Saweria Developer Support Button */}
@@ -6400,6 +6433,11 @@ function TradingGame() {
                 {dailyStreak?.badgeUnlocked && (
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
                     <span>👑 Disciplined Degen</span>
+                  </span>
+                )}
+                {shillerBadgeUnlocked && (
+                  <span data-testid="hud-shiller-badge" className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold flex items-center gap-1">
+                    <span>📢 Certified Shiller</span>
                   </span>
                 )}
               </div>
@@ -7686,7 +7724,27 @@ function TradingGame() {
                             </div>
 
                             {/* Tombol Aksi di Kanan */}
-                            <div className="sm:col-span-3 flex items-center justify-end w-full pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/70">
+                            <div className="sm:col-span-3 flex items-center justify-end gap-2 w-full pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/70">
+                              <button
+                                type="button"
+                                data-testid={`btn-flex-pos-${pos.id}`}
+                                onClick={() => handleOpenPnlModal({
+                                  pairSymbol: pos.pairSymbol,
+                                  type: pos.type,
+                                  leverage: pos.leverage,
+                                  entryPrice: pos.entryPrice,
+                                  margin: pos.margin,
+                                  roiPercent: roi,
+                                  pnlDollar: pnl,
+                                  posPrice: stats?.posPrice || currentPrice
+                                })}
+                                className="px-3 py-2.5 rounded-xl bg-[#00FF88]/15 hover:bg-[#00FF88]/25 text-[#00FF88] border border-[#00FF88]/40 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 whitespace-nowrap"
+                                title="Pamer PnL Posisi Ini ke Sosmed"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span>Flex</span>
+                              </button>
+
                               <button
                                 onClick={() => closePositionById(pos.id, false)}
                                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-amber-400/20 cursor-pointer shrink-0 transition-all active:scale-95 whitespace-nowrap"
@@ -8203,10 +8261,31 @@ function TradingGame() {
                               </div>
                             </div>
 
-                            <div className={`text-right shrink-0 font-extrabold text-xs ${
-                              isPositive ? 'text-[#00FF88]' : 'text-[#FF3366]'
-                            }`}>
-                              {isPositive ? '+' : '-'}{formatMoney(Math.abs(log.amount))}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className={`text-right font-extrabold text-xs ${
+                                isPositive ? 'text-[#00FF88]' : 'text-[#FF3366]'
+                              }`}>
+                                {isPositive ? '+' : '-'}{formatMoney(Math.abs(log.amount))}
+                              </div>
+                              {(log.type === 'TRADE' || log.type === 'TRADE_LIQ' || log.category === 'trade') && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleOpenPnlModal({
+                                      pairSymbol: log.title?.split(': ')?.[1]?.split(' ')?.[1] || 'BTC/USDT',
+                                      type: log.title?.includes('SHORT') ? 'SHORT' : 'LONG',
+                                      leverage: 50,
+                                      margin: Math.abs(log.amount || 10),
+                                      roiPercent: isPositive ? 45 : -25,
+                                      pnlDollar: log.amount || 0
+                                    });
+                                  }}
+                                  className="p-1 rounded-md text-slate-400 hover:text-[#00FF88] hover:bg-slate-800 transition-colors cursor-pointer"
+                                  title="📸 Flex PnL ke Sosmed"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -8324,6 +8403,25 @@ function TradingGame() {
 
             <div className="mt-6 flex flex-col gap-2.5">
               <button
+                type="button"
+                data-testid="btn-flex-liquidation"
+                onClick={() => {
+                  handleOpenPnlModal({
+                    pairSymbol: liquidationAlert.pair,
+                    type: liquidationAlert.type,
+                    leverage: liquidationAlert.leverage,
+                    margin: liquidationAlert.lostAmount,
+                    roiPercent: -100,
+                    pnlDollar: -liquidationAlert.lostAmount
+                  });
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-500/50 text-rose-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+              >
+                <Share2 className="w-4 h-4 text-rose-400" />
+                <span>📸 Pamer REKT (-100%) ke Sosmed {!shillerBadgeUnlocked && '(Klaim +$100)'}</span>
+              </button>
+
+              <button
                 onClick={handleBailoutAd}
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer"
               >
@@ -8344,17 +8442,24 @@ function TradingGame() {
       {showPnlModal && (
         <PnlShareModal
           isOpen={showPnlModal}
-          onClose={() => setShowPnlModal(false)}
+          onClose={() => {
+            setShowPnlModal(false);
+            setSelectedPnlTrade(null);
+          }}
           netWorth={netWorth}
           cash={cash}
           currentDps={currentDps}
           activePosition={activePosition ? { ...activePosition, ...(livePositionStats || {}) } : null}
           recentTrades={tradeHistory}
+          customTrade={selectedPnlTrade}
           currentLocation={currentLocation}
           formatMoney={formatMoney}
           formatNumber={formatNumber}
           t={t}
           language={language}
+          currentUser={currentUser}
+          shillerBadgeUnlocked={shillerBadgeUnlocked}
+          onClaimShillerReward={handleClaimShillerReward}
         />
       )}
 
