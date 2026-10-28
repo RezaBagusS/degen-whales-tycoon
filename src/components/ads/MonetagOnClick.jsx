@@ -4,13 +4,16 @@ import { useEffect } from 'react';
 import { ADS_CONFIG } from '../../config/adsConfig';
 
 /**
- * Monetag OnClick (Popunder) Ad Component
+ * Monetag Controlled Direct Link Component (Solusi 2)
  * 
- * ATURAN PENEMPATAN & KEBIJAKAN:
- * - Hanya aktif di halaman game utama (pathname: '/')
- * - DILARANG KERAS muncul di halaman /login, /register, /auth, atau /admin
- * - Hanya aktif jika onClickZoneId sudah diisi di adsConfig.js
- * - Hanya aktif di mode production
+ * KEBIJAKAN & LOGIKA KONTROL KETAT:
+ * 1. Tidak lagi menyuntikkan script pihak ketiga 'al5sm.com/tag.min.js'
+ *    (sehingga klik tombol trading Buy/Sell/Upgrade tidak dibajak terus-menerus).
+ * 2. Menggunakan Direct Link resmi Monetag (uplcm.com/4/12106307).
+ * 3. HANYA aktif di perangkat Desktop / PC (layar >= 1024px, non-touch).
+ * 4. HANYA terpicu 1x per 24 jam per user (diverifikasi via localStorage & sessionStorage).
+ * 5. Begitu klik pertama selesai, event listener langsung dicabut seketika.
+ *    Seluruh klik trading berikutnya 100% bersih dan bebas gangguan.
  */
 export default function MonetagOnClick() {
   useEffect(() => {
@@ -22,17 +25,12 @@ export default function MonetagOnClick() {
       return;
     }
 
-    const zoneId = ADS_CONFIG.monetag?.onClickZoneId;
-    if (!zoneId) {
+    const directLinkUrl = ADS_CONFIG.monetag?.directLinkUrl || 'https://uplcm.com/4/12106307';
+    if (!directLinkUrl) {
       return;
     }
 
-    // ── Desktop-only guard ──────────────────────────────────────────────────
-    // Jangan jalankan popunder di perangkat layar sentuh (mobile / tablet).
-    // Tiga sinyal dikombinasikan agar deteksi lebih akurat:
-    //   1. maxTouchPoints > 0  → hardware mendukung sentuhan
-    //   2. 'ontouchstart' di window → browser mobile klasik
-    //   3. layar lebar < 1024px    → ukuran tablet/phone
+    // ── Desktop-only guard (Khusus PC, non-touch) ────────────────────────────
     const isTouchDevice =
       (navigator.maxTouchPoints > 0) ||
       ('ontouchstart' in window) ||
@@ -40,7 +38,6 @@ export default function MonetagOnClick() {
     if (isTouchDevice) {
       return;
     }
-    // ───────────────────────────────────────────────────────────────────────
 
     const currentPath = window.location.pathname;
     const isGamePage = currentPath === '/' || currentPath === '';
@@ -51,83 +48,64 @@ export default function MonetagOnClick() {
     const STORAGE_KEY = 'degen_monetag_last_shown_ts';
     const LEGACY_STORAGE_KEY = 'degen_monetag_onclick_last_ts';
     const SESSION_KEY = 'degen_monetag_session_fired';
-    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 6;
+    const intervalHours = ADS_CONFIG.monetag?.onClickIntervalHours || 24;
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
-    // Cek batas frekuensi waktu terakhir iklan muncul (4 Jam) & Session Lock
+    // Cek batas frekuensi waktu terakhir iklan muncul (24 Jam) & Session Lock
     try {
       if (sessionStorage.getItem(SESSION_KEY) === '1') {
-        // Iklan sudah terpicu di sesi aktif ini, jangan muat script lagi
-        return;
+        return; // Sudah pernah terpicu di sesi aktif ini
       }
 
       const lastTriggered = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (lastTriggered) {
         const elapsed = Date.now() - Number(lastTriggered);
         if (elapsed < intervalMs) {
-          // Masih dalam periode jeda 4 jam, jangan muat script
-          return;
+          return; // Masih dalam masa jeda 24 jam
         }
       }
     } catch {
-      // Abaikan jika storage diblokir browser
+      // Abaikan jika storage diblokir
     }
 
-    const SCRIPT_ID = 'monetag-onclick-script';
-    if (document.getElementById(SCRIPT_ID)) {
-      return;
-    }
+    let isHandled = false;
 
-    let cleanupClickListener = null;
+    const handleFirstUserClick = (e) => {
+      if (isHandled) return;
 
-    try {
-      const script = document.createElement('script');
-      script.id = SCRIPT_ID;
-      script.dataset.zone = zoneId;
-      script.src = ADS_CONFIG.monetag?.onClickScriptUrl || 'https://al5sm.com/tag.min.js';
-      script.async = true;
-      script.setAttribute('data-cfasync', 'false');
-
-      const target = [document.documentElement, document.body].filter(Boolean).pop();
-      if (target) {
-        target.appendChild(script);
-
-        // Catat waktu klik pertama saat popunder terpicu, lalu kunci sesi
-        const onFirstUserClick = () => {
-          try {
-            const now = String(Date.now());
-            localStorage.setItem(STORAGE_KEY, now);
-            localStorage.setItem(LEGACY_STORAGE_KEY, now);
-            sessionStorage.setItem(SESSION_KEY, '1');
-          } catch {}
-          window.removeEventListener('click', onFirstUserClick, true);
-
-          // Segera bersihkan script dari DOM agar tidak mendengar klik berikutnya di sesi ini
-          const el = document.getElementById(SCRIPT_ID);
-          if (el && el.parentNode) {
-            el.parentNode.removeChild(el);
-          }
-        };
-
-        window.addEventListener('click', onFirstUserClick, true);
-        cleanupClickListener = () => {
-          window.removeEventListener('click', onFirstUserClick, true);
-        };
+      // Jangan picu jika klik di elemen input formulir
+      const target = e.target;
+      if (target && target.closest && target.closest('input, textarea, select, [data-prevent-ad="true"]')) {
+        return;
       }
-    } catch {
-      // Fail silently if blocked by adblocker
-    }
+
+      isHandled = true;
+
+      try {
+        const now = String(Date.now());
+        localStorage.setItem(STORAGE_KEY, now);
+        localStorage.setItem(LEGACY_STORAGE_KEY, now);
+        sessionStorage.setItem(SESSION_KEY, '1');
+      } catch {}
+
+      // Cabut listener seketika agar tidak ada lagi klik berikutnya yang terinterupsi
+      window.removeEventListener('click', handleFirstUserClick, true);
+
+      // Buka Direct Link Monetag di tab baru secara halus
+      try {
+        window.open(directLinkUrl, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        console.warn('Monetag direct link popup prevented:', err);
+      }
+    };
+
+    window.addEventListener('click', handleFirstUserClick, true);
 
     return () => {
-      if (cleanupClickListener) {
-        cleanupClickListener();
-      }
-      const existing = document.getElementById(SCRIPT_ID);
-      if (existing && existing.parentNode) {
-        existing.parentNode.removeChild(existing);
-      }
+      window.removeEventListener('click', handleFirstUserClick, true);
     };
   }, []);
 
   return null;
 }
+
