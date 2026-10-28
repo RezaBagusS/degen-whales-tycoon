@@ -33,24 +33,12 @@ export async function GET(request) {
       const msLeft = new Date(activeSeason.endDate).getTime() - now.getTime();
       const hoursLeft = Math.floor(msLeft / 3600000);
 
-      // Send 24-hour (H-1) warning broadcast
-      if (hoursLeft <= 24 && hoursLeft > 23) {
+      // Send H-1 warning broadcast (daily cron check)
+      if (hoursLeft <= 24 && hoursLeft > 0) {
         await prisma.broadcastAnnouncement.updateMany({ data: { isActive: false } });
         await prisma.broadcastAnnouncement.create({
           data: {
-            message: `⏳ H-1 SEASON ${activeSeason.number} BERAKHIR! Sisa waktu kurang dari 24 jam. Kunci posisi terbaikmu di leaderboard untuk amankan Trophy permanen! 🏆`,
-            type: 'warning',
-            isActive: true,
-          },
-        });
-      }
-
-      // Send 3-hour warning broadcast
-      if (hoursLeft <= 3 && hoursLeft > 2) {
-        await prisma.broadcastAnnouncement.updateMany({ data: { isActive: false } });
-        await prisma.broadcastAnnouncement.create({
-          data: {
-            message: `⚠️ Season ${activeSeason.number} berakhir dalam ~3 JAM! Cek posisi kamu di leaderboard sekarang. Top 3 dapat trophy permanen + bonus modal! 🏆`,
+            message: `⏳ H-1 SEASON ${activeSeason.number} BERAKHIR! Sisa waktu ~${hoursLeft} jam. Kunci posisi terbaikmu di leaderboard untuk amankan Trophy permanen! 🏆`,
             type: 'warning',
             isActive: true,
           },
