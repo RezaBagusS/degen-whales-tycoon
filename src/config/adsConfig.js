@@ -32,10 +32,10 @@ export const ADS_CONFIG = {
   monetag: {
     directLinkUrl: 'https://uplcm.com/4/12106307',
     directLinkZoneId: '12106307',
-    enableOnClickPopunder: false, // Dinonaktifkan: Mencegah redirect agresif saat pemain menekan tombol apapun di mobile
-    onClickZoneId: '', // Kosongkan agar script popunder tidak mengintervensi touch event di mobile
-    onClickScriptUrl: '',
-    onClickIntervalHours: 24
+    enableOnClickPopunder: true,   // Aktif hanya untuk perangkat desktop (non-touch)
+    onClickZoneId: '12121486',
+    onClickScriptUrl: 'https://al5sm.com/tag.min.js',
+    onClickIntervalHours: 24       // Popunder maksimal 1x per 24 jam per user
   },
 
   // Konfigurasi Google AdSense (isi jika sudah daftar di google.com/adsense)

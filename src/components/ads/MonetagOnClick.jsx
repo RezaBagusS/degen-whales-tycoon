@@ -27,6 +27,21 @@ export default function MonetagOnClick() {
       return;
     }
 
+    // ── Desktop-only guard ──────────────────────────────────────────────────
+    // Jangan jalankan popunder di perangkat layar sentuh (mobile / tablet).
+    // Tiga sinyal dikombinasikan agar deteksi lebih akurat:
+    //   1. maxTouchPoints > 0  → hardware mendukung sentuhan
+    //   2. 'ontouchstart' di window → browser mobile klasik
+    //   3. layar lebar < 1024px    → ukuran tablet/phone
+    const isTouchDevice =
+      (navigator.maxTouchPoints > 0) ||
+      ('ontouchstart' in window) ||
+      (window.innerWidth < 1024);
+    if (isTouchDevice) {
+      return;
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
     const currentPath = window.location.pathname;
     const isGamePage = currentPath === '/' || currentPath === '';
     if (!isGamePage) {
