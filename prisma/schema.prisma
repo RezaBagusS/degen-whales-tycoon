@@ -53,6 +53,10 @@ model GameSave {
   tradeHistory         Json     @default("[]")
   savePayload          Json?
 
+  // Season / Prestige System
+  seasonTrophies       Json     @default("[]")  // Permanent trophy hall — never reset
+  currentSeasonId      String?
+
   lastSavedAt          DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
@@ -68,6 +72,42 @@ model Syndicate {
   members          User[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// ─── Season / Prestige Reset System ─────────────────────────────────────────
+
+model Season {
+  id          String   @id @default(uuid())
+  number      Int      @unique                // Season 1, 2, 3 ...
+  startDate   DateTime
+  endDate     DateTime                        // Auto-reset runs when endDate is reached
+  isActive    Boolean  @default(true)
+  resetAt     DateTime?                       // Timestamp when the reset was executed
+  prizePool   Json     @default("{}")         // { first: 100, second: 50, third: 25 }
+
+  leaderboard SeasonLeaderboard[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([endDate])
+}
+
+model SeasonLeaderboard {
+  id           String   @id @default(uuid())
+  seasonId     String
+  season       Season   @relation(fields: [seasonId], references: [id])
+  userId       String
+  username     String
+  rank         Int
+  peakNetWorth Float
+  trophy       String   // e.g. "🐋 Grand Whale Trophy S1"
+  seasonTitle  String   // e.g. "Whale Supremacy S1"
+  headStart    Float    @default(0)           // Bonus cash added at next season start
+  snapshotAt   DateTime @default(now())
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, rank])
 }
 
 model PasswordResetToken {

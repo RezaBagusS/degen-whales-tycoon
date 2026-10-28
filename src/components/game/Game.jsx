@@ -90,6 +90,7 @@ import { APP_DISPLAY_VERSION } from '../../lib/version';
 import RewardedAdModal from './RewardedAdModal';
 import CreditsModal from './CreditsModal';
 import DailyStreakModal from './DailyStreakModal';
+import SeasonBanner from './SeasonBanner';
 import { getLocalDateString, getYesterdayDateString, evaluateStreakStatus } from '../../lib/dailyStreak';
 import { syncGameProgressToDB, fetchCurrentUser, logoutUser, loadGameProgressFromDB } from '../../lib/cloudSync';
 import { liveCryptoFeed } from '../../lib/liveCryptoFeed';
@@ -1499,6 +1500,7 @@ function TradingGame() {
     badgeUnlocked: false
   });
   const [showDailyStreakModal, setShowDailyStreakModal] = useState(false);
+  const [seasonTrophies, setSeasonTrophies] = useState([]);  // permanent, from cloud save
   const [whaleWarBanner, setWhaleWarBanner] = useState(false);
   const whaleActionHistoryRef = useRef([]);
   const meanReversionRef = useRef({ deltaPerStep: 0, stepsLeft: 0 });
@@ -2012,6 +2014,10 @@ function TradingGame() {
           } catch (e) {
             console.error('Auto cloud hydration check error:', e);
           }
+        }
+        // Load season trophies into state (permanent trophy hall)
+        if (data.save?.seasonTrophies && Array.isArray(data.save.seasonTrophies)) {
+          setSeasonTrophies(data.save.seasonTrophies);
         }
       }
     });
@@ -5915,6 +5921,13 @@ function TradingGame() {
           </div>
         </div>
       )}
+      {/* Season / Prestige Banner */}
+      <div className="px-4 py-1.5 border-b border-slate-800/60 bg-slate-950/50">
+        <SeasonBanner
+          currentUsername={currentUser?.username || null}
+          seasonTrophies={seasonTrophies}
+        />
+      </div>
       {/* Developer Compensation In-Game Banner */}
       {receivedCompensation && !compensationDismissed && (
         <div

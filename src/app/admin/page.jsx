@@ -359,13 +359,398 @@ function HourlyTrendChart({ data = [] }) {
   );
 }
 
+// ─── Season Manager Tab Component ─────────────────────────────────────────────
+function SeasonManagerTab({
+  adminKey,
+  seasonData,
+  setSeasonData,
+  seasonLoading,
+  setSeasonLoading,
+  seasonMsg,
+  setSeasonMsg
+}) {
+  const [durationDays, setDurationDays] = useState(14);
+  const [confirmEndText, setConfirmEndText] = useState('');
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [pastSeasons, setPastSeasons] = useState([]);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const fetchSeasonData = useCallback(async () => {
+    setSeasonLoading(true);
+    try {
+      const [curRes, allRes] = await Promise.all([
+        fetch('/api/season/current'),
+        fetch('/api/season/leaderboard')
+      ]);
+      const curData = await curRes.json();
+      const allData = await allRes.json();
+      if (curData.success) {
+        setSeasonData(curData.season);
+      }
+      if (allData.success && Array.isArray(allData.seasons)) {
+        setPastSeasons(allData.seasons);
+      }
+    } catch (e) {
+      console.error('Failed to load season data:', e);
+    } finally {
+      setSeasonLoading(false);
+    }
+  }, [setSeasonData, setSeasonLoading]);
+
+  useEffect(() => {
+    fetchSeasonData();
+  }, [fetchSeasonData]);
+
+  const handleStartSeason = async () => {
+    if (!window.confirm(`Mulai Season baru dengan durasi ${durationDays} hari?`)) return;
+    setActionLoading(true);
+    setSeasonMsg(null);
+    try {
+      const res = await fetch('/api/admin/season/end', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        },
+        body: JSON.stringify({ durationDays: Number(durationDays) || 14 })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSeasonMsg({ type: 'success', text: `Season ${result.season.number} berhasil dimulai!` });
+        fetchSeasonData();
+      } else {
+        setSeasonMsg({ type: 'error', text: result.error || 'Gagal memulai season' });
+      }
+    } catch (e) {
+      setSeasonMsg({ type: 'error', text: e.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleForceEndSeason = async () => {
+    if (confirmEndText !== 'RESET') {
+      alert('Ketik RESET untuk mengonfirmasi pengakhiran season.');
+      return;
+    }
+    setActionLoading(true);
+    setSeasonMsg(null);
+    try {
+      const res = await fetch('/api/admin/season/end', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        }
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSeasonMsg({ type: 'success', text: result.message });
+        setShowEndModal(false);
+        setConfirmEndText('');
+        fetchSeasonData();
+      } else {
+        setSeasonMsg({ type: 'error', text: result.error || 'Gagal mengakhiri season' });
+      }
+    } catch (e) {
+      setSeasonMsg({ type: 'error', text: e.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Alert Banner */}
+      {seasonMsg && (
+        <div
+          className={`p-4 rounded-xl border flex items-center justify-between ${
+            seasonMsg.type === 'success'
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+              : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span>{seasonMsg.type === 'success' ? '✅' : '⚠️'}</span>
+            <span className="text-sm font-mono">{seasonMsg.text}</span>
+          </div>
+          <button
+            onClick={() => setSeasonMsg(null)}
+            className="text-xs opacity-60 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Season Status Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Active Season */}
+        <div className="bg-[#0b0e14]/90 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-slate-400 font-mono">Status Season</span>
+              {seasonData ? (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  AKTIF (S{seasonData.number})
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-slate-800 text-slate-400">
+                  TIDAK ADA SEASON
+                </span>
+              )}
+            </div>
+            <div className="text-2xl font-black text-white font-mono flex items-center gap-2">
+              <span>🏆</span>
+              {seasonData ? `Season ${seasonData.number}` : 'Off-Season'}
+            </div>
+            {seasonData && (
+              <p className="text-xs text-slate-400 mt-2 font-mono">
+                {new Date(seasonData.startDate).toLocaleDateString('id-ID')} — {new Date(seasonData.endDate).toLocaleDateString('id-ID')}
+              </p>
+            )}
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs font-mono text-slate-400">
+            <span>Sisa Waktu:</span>
+            {seasonData?.timeLeft ? (
+              <span className="text-yellow-400 font-bold">
+                {seasonData.timeLeft.days}h {seasonData.timeLeft.hours}j {seasonData.timeLeft.minutes}m
+              </span>
+            ) : (
+              <span>—</span>
+            )}
+          </div>
+        </div>
+
+        {/* Card 2: Prize Structure */}
+        <div className="bg-[#0b0e14]/90 border border-slate-800/80 p-5 rounded-2xl">
+          <span className="text-xs uppercase tracking-wider text-slate-400 font-mono">Struktur Reward Trophy</span>
+          <div className="mt-3 space-y-2 text-xs font-mono">
+            <div className="flex items-center justify-between text-yellow-400">
+              <span>🥇 Rank 1</span>
+              <span>Grand Whale Trophy + $100 Start</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300">
+              <span>🥈 Rank 2</span>
+              <span>Silver Shark Trophy + $50 Start</span>
+            </div>
+            <div className="flex items-center justify-between text-amber-600">
+              <span>🥉 Rank 3</span>
+              <span>Bronze Degen Trophy + $25 Start</span>
+            </div>
+            <div className="flex items-center justify-between text-cyan-400">
+              <span>⭐ Top 10%</span>
+              <span>Season Veteran Trophy + $5 Start</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Quick Action Controls */}
+        <div className="bg-[#0b0e14]/90 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+          <div>
+            <span className="text-xs uppercase tracking-wider text-slate-400 font-mono">Kontrol Season</span>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="90"
+                value={durationDays}
+                onChange={(e) => setDurationDays(e.target.value)}
+                className="w-20 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-white text-center"
+              />
+              <span className="text-xs text-slate-400 font-mono">Hari Durasi</span>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={handleStartSeason}
+              disabled={actionLoading || seasonLoading}
+              className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-mono font-bold transition-all shadow-md cursor-pointer text-center"
+            >
+              {actionLoading ? 'Memproses...' : seasonData ? 'Mulai Season Baru' : 'Start Season 1'}
+            </button>
+            <button
+              onClick={fetchSeasonData}
+              disabled={seasonLoading}
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-mono transition-all cursor-pointer"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${seasonLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Danger Zone: Force End Season */}
+      {seasonData && (
+        <div className="bg-rose-950/20 border border-rose-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Zona Bahaya: Reset &amp; Akhiri Season Lebih Awal</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl font-mono">
+              Tindakan ini akan mengabadikan leaderboard saat ini, memberikan Trophy permanen kepada pemenang, lalu me-reset cash semua pemain ke modal awal ($10 + reward).
+            </p>
+          </div>
+          <button
+            onClick={() => setShowEndModal(true)}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-mono font-bold shrink-0 transition-all cursor-pointer shadow-lg shadow-rose-900/30"
+          >
+            🚨 Akhiri Season Sekarang
+          </button>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Reset */}
+      {showEndModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0d1117] border border-rose-500/50 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-base mb-2">
+              <AlertTriangle className="w-5 h-5" />
+              <span>Konfirmasi Reset Season</span>
+            </div>
+            <p className="text-xs text-slate-300 font-mono leading-relaxed mb-4">
+              PERINGATAN: Semua saldo pemain akan di-reset ke $10 (+ bonus rank). Leaderboard akan dikunci dan diarsip permanen. Ketik <strong className="text-rose-400">RESET</strong> untuk melanjutkan:
+            </p>
+            <input
+              type="text"
+              placeholder="Ketik RESET"
+              value={confirmEndText}
+              onChange={(e) => setConfirmEndText(e.target.value)}
+              className="w-full px-3 py-2 bg-black border border-rose-500/40 rounded-xl text-white font-mono text-sm mb-4 focus:outline-none focus:border-rose-400"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEndModal(false);
+                  setConfirmEndText('');
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white bg-slate-800"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleForceEndSeason}
+                disabled={confirmEndText !== 'RESET' || actionLoading}
+                className="px-4 py-2 rounded-xl text-xs font-mono font-bold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-40 cursor-pointer"
+              >
+                {actionLoading ? 'Mereset...' : 'Ya, Akhiri Season'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Season Leaderboard */}
+      <div className="bg-[#0b0e14]/90 border border-slate-800/80 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-mono font-bold text-white">🏆 Leaderboard Season {seasonData ? `S${seasonData.number}` : ''}</span>
+            <span className="text-xs font-mono text-slate-500">({seasonData?.leaderboard?.length || 0} Teratas)</span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400">Berdasarkan Peak Net Worth</span>
+        </div>
+
+        {seasonData?.leaderboard && seasonData.leaderboard.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="py-2 px-3">Rank</th>
+                  <th className="py-2 px-3">Username</th>
+                  <th className="py-2 px-3">Peak Net Worth</th>
+                  <th className="py-2 px-3">Proyeksi Trophy</th>
+                  <th className="py-2 px-3">Head-Start Bonus</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/40">
+                {seasonData.leaderboard.map((item, idx) => {
+                  const rank = item.rank || idx + 1;
+                  return (
+                    <tr key={idx} className="hover:bg-slate-900/50">
+                      <td className="py-2.5 px-3 font-bold text-white">
+                        {rank === 1 ? '🥇 1' : rank === 2 ? '🥈 2' : rank === 3 ? '🥉 3' : `#${rank}`}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-white">@{item.username}</td>
+                      <td className="py-2.5 px-3 text-emerald-400 font-bold">{formatMoney(item.peakNetWorth)}</td>
+                      <td className="py-2.5 px-3 text-yellow-400">{item.trophy || '—'}</td>
+                      <td className="py-2.5 px-3 text-cyan-400 font-mono">{item.headStart ? `+$${item.headStart}` : '$0'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-xs font-mono text-slate-500">
+            Belum ada leaderboard atau season belum aktif.
+          </div>
+        )}
+      </div>
+
+      {/* Past Seasons / Hall of Fame */}
+      <div className="bg-[#0b0e14]/90 border border-slate-800/80 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-mono font-bold text-white">📜 Riwayat Season &amp; Hall of Fame</span>
+          <span className="text-xs font-mono text-slate-500">{pastSeasons.length} Season Terdata</span>
+        </div>
+
+        {pastSeasons.length > 0 ? (
+          <div className="space-y-4">
+            {pastSeasons.map((s) => (
+              <div key={s.id} className="p-4 rounded-xl border border-slate-800/60 bg-slate-900/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-white text-sm">Season {s.number}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${s.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                      {s.isActive ? 'Sedang Berjalan' : 'Selesai'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-slate-500">
+                    {new Date(s.startDate).toLocaleDateString('id-ID')} — {new Date(s.endDate).toLocaleDateString('id-ID')}
+                  </span>
+                </div>
+                {s.leaderboard && s.leaderboard.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+                    {s.leaderboard.slice(0, 3).map((w) => (
+                      <div key={w.id} className="p-2.5 rounded-lg bg-black/40 border border-slate-800/40 text-xs font-mono flex items-center justify-between">
+                        <div className="flex items-center gap-2 truncate">
+                          <span>{w.rank === 1 ? '🥇' : w.rank === 2 ? '🥈' : '🥉'}</span>
+                          <span className="text-white font-semibold truncate">@{w.username}</span>
+                        </div>
+                        <span className="text-emerald-400 text-[11px] shrink-0">{formatMoney(w.peakNetWorth)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 font-mono mt-1">Belum ada pemenang yang diarsipkan.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-xs font-mono text-slate-500">
+            Belum ada riwayat season sebelumnya.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'players' | 'risk' | 'apm'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'players' | 'risk' | 'launchpad' | 'apm' | 'season'
   const [autoRefreshSec, setAutoRefreshSec] = useState(10);
+
+  // ── Season Manager state ──────────────────────────────────────────────────
+  const [seasonData, setSeasonData] = useState(null);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+  const [seasonMsg, setSeasonMsg] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -1073,7 +1458,31 @@ export default function AdminDashboard() {
             <Cpu className="w-4 h-4" />
             <span>APM &amp; Sentry Logs ({data?.apm?.errorCountTotal || 0})</span>
           </button>
+          <button
+            onClick={() => setActiveTab('season')}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
+              activeTab === 'season'
+                ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <span>🏆</span>
+            <span>Season Manager</span>
+          </button>
         </div>
+
+        {/* TAB: SEASON MANAGER */}
+        {activeTab === 'season' && (
+          <SeasonManagerTab
+            adminKey={adminKey}
+            seasonData={seasonData}
+            setSeasonData={setSeasonData}
+            seasonLoading={seasonLoading}
+            setSeasonLoading={setSeasonLoading}
+            seasonMsg={seasonMsg}
+            setSeasonMsg={setSeasonMsg}
+          />
+        )}
 
         {/* TAB 1: OVERVIEW & TELEMETRI */}
         {activeTab === 'overview' && (
