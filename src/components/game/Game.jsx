@@ -1501,6 +1501,8 @@ function TradingGame() {
   });
   const [showDailyStreakModal, setShowDailyStreakModal] = useState(false);
   const [seasonTrophies, setSeasonTrophies] = useState([]);  // permanent, from cloud save
+  const [showSeasonModal, setShowSeasonModal] = useState(false);
+  const [activeSeason, setActiveSeason] = useState(null);
   const [whaleWarBanner, setWhaleWarBanner] = useState(false);
   const whaleActionHistoryRef = useRef([]);
   const meanReversionRef = useRef({ deltaPerStep: 0, stepsLeft: 0 });
@@ -5926,6 +5928,9 @@ function TradingGame() {
         <SeasonBanner
           currentUsername={currentUser?.username || null}
           seasonTrophies={seasonTrophies}
+          externalOpen={showSeasonModal}
+          onExternalOpenChange={setShowSeasonModal}
+          onSeasonLoaded={setActiveSeason}
         />
       </div>
       {/* Developer Compensation In-Game Banner */}
@@ -6113,62 +6118,84 @@ function TradingGame() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4 sm:gap-5">
-        {/* 1. Main Mode Navigation Bar (Perps Futures, Meme Launchpad, Shop) */}
-        <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-[#090D15] rounded-xl border border-slate-800/80 w-full sm:w-fit overflow-x-auto scrollbar-none">
-          <button
-            type="button"
-            data-testid="mode-perps"
-            onClick={() => setTradingMode('perps')}
-            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
-              tradingMode === 'perps'
-                ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4 text-slate-300" />
-            <span>{t.modePerps || 'Perps Futures'}</span>
-          </button>
+        {/* 1. Main Mode Navigation Bar (Perps Futures, Meme Launchpad, Shop) + Season Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full">
+          <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-[#090D15] rounded-xl border border-slate-800/80 w-full sm:w-fit overflow-x-auto scrollbar-none">
+            <button
+              type="button"
+              data-testid="mode-perps"
+              onClick={() => setTradingMode('perps')}
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
+                tradingMode === 'perps'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 text-slate-300" />
+              <span>{t.modePerps || 'Perps Futures'}</span>
+            </button>
 
-          <button
-            type="button"
-            data-testid="mode-launchpad"
-            onClick={() => setTradingMode('launchpad')}
-            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
-              tradingMode === 'launchpad'
-                ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-            }`}
-          >
-            <Rocket className="w-4 h-4 text-slate-300" />
-            <span>{t.modeLaunchpad || 'Meme Launchpad'}</span>
-            {memeSchedule.isOpen ? (
-              <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-[#00FF88] text-[9px] font-mono font-bold border border-emerald-500/30 animate-pulse">
-                LIVE
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[9px] font-mono">
-                {formatCountdownMmSs(memeSchedule.remainingCooldownMs)}
-              </span>
-            )}
-          </button>
+            <button
+              type="button"
+              data-testid="mode-launchpad"
+              onClick={() => setTradingMode('launchpad')}
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
+                tradingMode === 'launchpad'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <Rocket className="w-4 h-4 text-slate-300" />
+              <span>{t.modeLaunchpad || 'Meme Launchpad'}</span>
+              {memeSchedule.isOpen ? (
+                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-[#00FF88] text-[9px] font-mono font-bold border border-emerald-500/30 animate-pulse">
+                  LIVE
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[9px] font-mono">
+                  {formatCountdownMmSs(memeSchedule.remainingCooldownMs)}
+                </span>
+              )}
+            </button>
 
+            <button
+              type="button"
+              data-testid="mode-shop"
+              onClick={() => setTradingMode('shop')}
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
+                tradingMode === 'shop'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+              }`}
+            >
+              <Store className="w-4 h-4 text-slate-300" />
+              <span>{t.modeShop || 'Shop'}</span>
+              {bmSchedule.isOpen ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-400" title="Pasar Gelap Buka" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-600" title="Pasar Gelap Tutup" />
+              )}
+            </button>
+          </div>
+
+          {/* Di seberang kanan tab Shop: Button Season Saat Ini */}
           <button
             type="button"
-            data-testid="mode-shop"
-            onClick={() => setTradingMode('shop')}
-            className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
-              tradingMode === 'shop'
-                ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-            }`}
+            data-testid="mode-season-btn"
+            onClick={() => setShowSeasonModal(true)}
+            className="flex items-center justify-between sm:justify-center gap-2 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl border border-yellow-500/40 bg-gradient-to-r from-yellow-950/40 via-slate-900 to-amber-950/40 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-950/30 text-xs font-mono font-bold text-yellow-300 transition-all cursor-pointer shrink-0 self-stretch sm:self-auto"
+            title="Buka Leaderboard &amp; Aturan Season Saat Ini"
           >
-            <Store className="w-4 h-4 text-slate-300" />
-            <span>{t.modeShop || 'Shop'}</span>
-            {bmSchedule.isOpen ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" title="Pasar Gelap Buka" />
-            ) : (
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-600" title="Pasar Gelap Tutup" />
-            )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">🏆</span>
+              <span className="text-white font-bold">
+                {activeSeason ? `Season ${activeSeason.number}` : 'Season'}
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-mono border border-yellow-500/30 flex items-center gap-1">
+              <span>Leaderboard &amp; Info</span>
+              <span>▾</span>
+            </span>
           </button>
         </div>
 

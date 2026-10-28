@@ -49,14 +49,29 @@ function TrophyRow({ entry, isUser }) {
 }
 
 // ── Main SeasonBanner ─────────────────────────────────────────────────────────
-export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
+export default function SeasonBanner({
+  currentUsername,
+  seasonTrophies = [],
+  externalOpen = false,
+  onExternalOpenChange = null,
+  onSeasonLoaded = null
+}) {
   const [season, setSeason] = useState(null);
   const [msLeft, setMsLeft] = useState(0);
-  const [showModal, setShowModal] = useState(false);
+  const [internalShowModal, setInternalShowModal] = useState(false);
   const [tab, setTab] = useState('live');
   const [hallOfFame, setHallOfFame] = useState([]);
   const [hofLoading, setHofLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  const showModal = onExternalOpenChange ? externalOpen : internalShowModal;
+  const setShowModal = useCallback((val) => {
+    if (onExternalOpenChange) {
+      onExternalOpenChange(val);
+    } else {
+      setInternalShowModal(val);
+    }
+  }, [onExternalOpenChange]);
 
   // Fetch current season
   const fetchSeason = useCallback(async () => {
@@ -66,9 +81,10 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
       if (data.success && data.season) {
         setSeason(data.season);
         setMsLeft(data.season.timeLeft?.ms || 0);
+        onSeasonLoaded?.(data.season);
       }
     } catch { /* silent */ }
-  }, []);
+  }, [onSeasonLoaded]);
 
   useEffect(() => { fetchSeason(); }, [fetchSeason]);
 
@@ -101,7 +117,7 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
     if (showModal && tab === 'hof') loadHof();
   }, [showModal, tab, loadHof]);
 
-  if (!season || dismissed) return null;
+  if (!season) return null;
 
   const leaderboard = season.leaderboard || [];
   const myEntry = leaderboard.find(e => e.username === currentUsername);
@@ -111,8 +127,9 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
   return (
     <>
       {/* ── Compact Season Banner (Mobile & iPhone XR Optimized) ── */}
-      <div
-        className={`relative flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs rounded-lg border cursor-pointer select-none transition-all ${
+      {!dismissed && (
+        <div
+          className={`relative flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs rounded-lg border cursor-pointer select-none transition-all ${
           isUrgent
             ? 'bg-red-950/80 border-red-500/80 shadow-lg shadow-red-950/50 animate-pulse text-red-200'
             : isHMinus1
@@ -146,7 +163,8 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
           </span>
         )}
         <span className="text-slate-500 text-xs shrink-0">▾</span>
-      </div>
+        </div>
+      )}
 
       {/* ── Leaderboard Modal (Responsive bottom-sheet / modal for iPhone XR) ── */}
       {showModal && (
@@ -217,10 +235,11 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
               )}
             </div>
 
-            {/* Tab switch (iPhone XR friendly labels) */}
+            {/* Tab switch (iPhone XR friendly labels with Info tab) */}
             <div className="flex border-b border-slate-800 bg-slate-950/40 shrink-0">
               {[
                 ['live', '📊 Live', '📊 Live Rankings'],
+                ['info', 'ℹ️ Info', 'ℹ️ Aturan & Hadiah'],
                 ['hof', '🏛️ History', '🏛️ Hall of Fame'],
                 ['mytrophies', '🎖️ Trofi', '🎖️ Trofi Kamu']
               ].map(([k, shortLabel, fullLabel]) => (
@@ -240,7 +259,65 @@ export default function SeasonBanner({ currentUsername, seasonTrophies = [] }) {
             </div>
 
             {/* Tab content (scrollable on mobile) */}
-            <div className="p-3 sm:p-4 flex-1 overflow-y-auto space-y-1.5 overscroll-contain">
+            <div className="p-3 sm:p-4 flex-1 overflow-y-auto space-y-2 overscroll-contain">
+              {tab === 'info' && (
+                <div className="space-y-3 font-mono text-xs text-slate-300 p-1">
+                  {/* Card 1: Konsep Season */}
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div className="flex items-center gap-2 font-bold text-white mb-1.5">
+                      <span className="text-sm">🏆</span>
+                      <span>Apa itu Season &amp; Prestige?</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Setiap Season berdurasi tertentu. Seluruh pemain bersaing mencetak rekor <strong className="text-emerald-400">Peak Net Worth</strong> tertinggi dari akumulasi hasil trading di <strong className="text-cyan-300">Semua Ticker</strong> (BTC, ETH, SOL, Meme Launchpad, dll.).
+                    </p>
+                  </div>
+
+                  {/* Card 2: Mekanisme Reset */}
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div className="flex items-center gap-2 font-bold text-white mb-1.5">
+                      <span className="text-sm">🔄</span>
+                      <span>Mekanisme Reset Akhir Season</span>
+                    </div>
+                    <ul className="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
+                      <li><strong className="text-white">Modal Cash</strong>: Kembali ke $10 (+ bonus modal juara).</li>
+                      <li><strong className="text-white">Item &amp; Equipment</strong>: Di-reset ke level 1 untuk keadilan pemain baru.</li>
+                      <li><strong className="text-white">Trophy &amp; Gelar</strong>: <span className="text-cyan-400 font-bold">100% Permanen</span> tersimpan abadi di tab Trofi Kamu &amp; Hall of Fame!</li>
+                    </ul>
+                  </div>
+
+                  {/* Card 3: Struktur Hadiah */}
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div className="flex items-center gap-2 font-bold text-white mb-2">
+                      <span className="text-sm">🎁</span>
+                      <span>Hadiah &amp; Kehormatan Peringkat</span>
+                    </div>
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex justify-between items-center text-yellow-400">
+                        <span>🥇 Juara 1 (Grand Whale)</span>
+                        <span className="font-bold">+$100 Start Bonus</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-300">
+                        <span>🥈 Juara 2 (Silver Shark)</span>
+                        <span className="font-bold">+$50 Start Bonus</span>
+                      </div>
+                      <div className="flex justify-between items-center text-amber-600">
+                        <span>🥉 Juara 3 (Bronze Degen)</span>
+                        <span className="font-bold">+$25 Start Bonus</span>
+                      </div>
+                      <div className="flex justify-between items-center text-cyan-400">
+                        <span>⭐ Top 10% (Season Veteran)</span>
+                        <span className="font-bold">+$5 Start Bonus</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Tips Skor High-Water Mark */}
+                  <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-[11px] text-emerald-300">
+                    <strong className="text-emerald-400">💡 Tips:</strong> Peringkat menggunakan sistem <span className="underline">Peak Net Worth</span> (rekor tertinggi). Jika setelah profit saldo Anda turun atau terlikuidasi, skor puncak Anda di leaderboard tetap aman tidak berkurang!
+                  </div>
+                </div>
+              )}
               {tab === 'live' && (
                 leaderboard.length === 0
                   ? <p className="text-center text-slate-500 py-8 text-xs sm:text-sm">Belum ada data. Mulai trading!</p>
