@@ -54,7 +54,8 @@ export default function SeasonBanner({
   seasonTrophies = [],
   externalOpen = false,
   onExternalOpenChange = null,
-  onSeasonLoaded = null
+  onSeasonLoaded = null,
+  onCountdownTick = null
 }) {
   const [season, setSeason] = useState(null);
   const [msLeft, setMsLeft] = useState(0);
@@ -62,7 +63,6 @@ export default function SeasonBanner({
   const [tab, setTab] = useState('live');
   const [hallOfFame, setHallOfFame] = useState([]);
   const [hofLoading, setHofLoading] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
   const showModal = onExternalOpenChange ? externalOpen : internalShowModal;
   const setShowModal = useCallback((val) => {
@@ -95,6 +95,30 @@ export default function SeasonBanner({
     return () => clearInterval(t);
   }, [season]);
 
+  // Emit countdown tick to parent
+  useEffect(() => {
+    if (!season) return;
+    const isHMinus1 = msLeft > 0 && msLeft <= 24 * 3600000;
+    const isUrgent = msLeft > 0 && msLeft < 3 * 3600000;
+    const d = Math.floor(msLeft / 86400000);
+    const h = Math.floor((msLeft % 86400000) / 3600000);
+    const m = Math.floor((msLeft % 3600000) / 60000);
+    const s = Math.floor((msLeft % 60000) / 1000);
+    const formatted =
+      msLeft <= 0
+        ? 'RESETTING'
+        : d > 0
+        ? `${d}d ${pad(h)}h`
+        : `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+    onCountdownTick?.({
+      msLeft,
+      formatted,
+      isHMinus1,
+      isUrgent
+    });
+  }, [msLeft, season, onCountdownTick]);
+
   // Refresh leaderboard every 60s
   useEffect(() => {
     const t = setInterval(fetchSeason, 60000);
@@ -126,46 +150,6 @@ export default function SeasonBanner({
 
   return (
     <>
-      {/* ── Compact Season Banner (Mobile & iPhone XR Optimized) ── */}
-      {!dismissed && (
-        <div
-          className={`relative flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs rounded-lg border cursor-pointer select-none transition-all ${
-          isUrgent
-            ? 'bg-red-950/80 border-red-500/80 shadow-lg shadow-red-950/50 animate-pulse text-red-200'
-            : isHMinus1
-            ? 'bg-amber-950/70 border-amber-500/60 shadow-md shadow-amber-950/40 text-amber-200'
-            : 'bg-slate-900/70 border-cyan-500/20 hover:border-cyan-400/40 text-slate-300'
-        }`}
-        onClick={() => setShowModal(true)}
-        title="Klik untuk lihat leaderboard season"
-      >
-        <span className="flex items-center gap-1 sm:gap-1.5 font-bold shrink-0">
-          <span className={isUrgent ? 'animate-bounce' : ''}>{isUrgent ? '🚨' : isHMinus1 ? '⏳' : '🏆'}</span>
-          <span className={isUrgent ? 'text-red-300' : isHMinus1 ? 'text-amber-300' : 'text-cyan-300'}>
-            <span className="sm:inline hidden">Season </span>
-            <span>S{season.number}</span>
-          </span>
-        </span>
-        <span className="flex items-center gap-1 font-mono text-[10px] sm:text-xs truncate">
-          {isUrgent ? (
-            <span className="text-red-400 font-bold uppercase tracking-tight shrink-0">Akhir:</span>
-          ) : isHMinus1 ? (
-            <span className="text-amber-400 font-bold shrink-0">H-1:</span>
-          ) : (
-            <span className="text-slate-400 shrink-0">Sisa:</span>
-          )}
-          <Countdown ms={msLeft} />
-        </span>
-        {myEntry && (
-          <span className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-300 shrink-0">
-            <span className="hidden xs:inline text-slate-400">Rank:</span>
-            <span className="font-bold text-cyan-300 bg-cyan-950/70 border border-cyan-500/30 px-1 rounded font-mono">#{myEntry.rank}</span>
-          </span>
-        )}
-        <span className="text-slate-500 text-xs shrink-0">▾</span>
-        </div>
-      )}
-
       {/* ── Leaderboard Modal (Responsive bottom-sheet / modal for iPhone XR) ── */}
       {showModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm" onClick={() => setShowModal(false)}>

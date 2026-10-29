@@ -1503,6 +1503,7 @@ function TradingGame() {
   const [seasonTrophies, setSeasonTrophies] = useState([]);  // permanent, from cloud save
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [activeSeason, setActiveSeason] = useState(null);
+  const [seasonCountdownInfo, setSeasonCountdownInfo] = useState(null);
   const [whaleWarBanner, setWhaleWarBanner] = useState(false);
   const whaleActionHistoryRef = useRef([]);
   const meanReversionRef = useRef({ deltaPerStep: 0, stepsLeft: 0 });
@@ -5923,16 +5924,15 @@ function TradingGame() {
           </div>
         </div>
       )}
-      {/* Season / Prestige Banner */}
-      <div className="px-4 py-1.5 border-b border-slate-800/60 bg-slate-950/50">
-        <SeasonBanner
-          currentUsername={currentUser?.username || null}
-          seasonTrophies={seasonTrophies}
-          externalOpen={showSeasonModal}
-          onExternalOpenChange={setShowSeasonModal}
-          onSeasonLoaded={setActiveSeason}
-        />
-      </div>
+      {/* Season Modal & Logic (countdown relocated to mode-season-btn) */}
+      <SeasonBanner
+        currentUsername={currentUser?.username || null}
+        seasonTrophies={seasonTrophies}
+        externalOpen={showSeasonModal}
+        onExternalOpenChange={setShowSeasonModal}
+        onSeasonLoaded={setActiveSeason}
+        onCountdownTick={setSeasonCountdownInfo}
+      />
       {/* Developer Compensation In-Game Banner */}
       {receivedCompensation && !compensationDismissed && (
         <div
@@ -6178,13 +6178,13 @@ function TradingGame() {
             </button>
           </div>
 
-          {/* Di seberang kanan tab Shop: Button Season Saat Ini */}
+          {/* Di seberang kanan tab Shop: Button Season Saat Ini dengan Live Countdown */}
           <button
             type="button"
             data-testid="mode-season-btn"
             onClick={() => setShowSeasonModal(true)}
             className="flex items-center justify-between sm:justify-center gap-2 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl border border-yellow-500/40 bg-gradient-to-r from-yellow-950/40 via-slate-900 to-amber-950/40 hover:border-yellow-400/80 hover:shadow-lg hover:shadow-yellow-950/30 text-xs font-mono font-bold text-yellow-300 transition-all cursor-pointer shrink-0 self-stretch sm:self-auto"
-            title="Buka Leaderboard &amp; Aturan Season Saat Ini"
+            title="Buka Leaderboard & Aturan Season Saat Ini"
           >
             <div className="flex items-center gap-1.5">
               <span className="text-sm">🏆</span>
@@ -6192,10 +6192,23 @@ function TradingGame() {
                 {activeSeason ? `Season ${activeSeason.number}` : 'Season'}
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-mono border border-yellow-500/30 flex items-center gap-1">
-              <span>Leaderboard &amp; Info</span>
-              <span>▾</span>
-            </span>
+            {seasonCountdownInfo?.formatted ? (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 ${
+                seasonCountdownInfo.isUrgent
+                  ? 'bg-rose-500/25 text-rose-300 border-rose-500/50 font-black animate-pulse'
+                  : seasonCountdownInfo.isHMinus1
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                  : 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30 font-medium'
+              }`}>
+                <span>{seasonCountdownInfo.isUrgent ? '🚨' : seasonCountdownInfo.isHMinus1 ? '⏳' : '⏱️'}</span>
+                <span>{seasonCountdownInfo.isHMinus1 ? `H-1: ${seasonCountdownInfo.formatted}` : seasonCountdownInfo.formatted}</span>
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-mono border border-yellow-500/30 flex items-center gap-1">
+                <span>Info</span>
+                <span>▾</span>
+              </span>
+            )}
           </button>
         </div>
 
