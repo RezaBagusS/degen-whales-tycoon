@@ -5,6 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    if (!prisma?.season) {
+      return NextResponse.json({ success: true, season: null });
+    }
+
     const season = await prisma.season.findFirst({
       where: { isActive: true },
       orderBy: { number: 'desc' },

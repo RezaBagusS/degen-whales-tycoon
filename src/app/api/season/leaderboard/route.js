@@ -8,7 +8,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const seasonNumber = searchParams.get('season'); // optional filter
 
-    const where = seasonNumber ? { number: parseInt(seasonNumber) } : {};
+    if (!prisma?.season) {
+      return NextResponse.json({ success: true, seasons: [] });
+    }
 
     const seasons = await prisma.season.findMany({
       where,

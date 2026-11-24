@@ -28,6 +28,16 @@ export const ADS_CONFIG = {
     sponsorTagline: 'Mitra Likuiditas Global Mendanai Ekosistem Trading & Pertumbuhan Trader'
   },
 
+  // Affiliate & Referral Links
+  affiliate: {
+    binance: {
+      url: 'https://www.bmwweb.biz/register?ref=KTI9W9J1',
+      referralCode: 'KTI9W9J1',
+      discountPercent: '20%',
+      label: 'Trade Real Binance',
+    }
+  },
+
   // Konfigurasi Monetag (resmi terhubung dengan direct link rewarded)
   monetag: {
     directLinkUrl: 'https://uplcm.com/4/12106307',

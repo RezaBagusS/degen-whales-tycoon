@@ -5819,6 +5819,20 @@ function TradingGame() {
               <span className="hidden sm:inline">{language === 'en' ? 'Support Dev' : 'Traktir Dev'}</span>
             </a>
 
+            {/* Binance Real Trading Referral Button */}
+            <a
+              data-testid="btn-binance-header"
+              href={ADS_CONFIG.affiliate?.binance?.url || "https://www.bmwweb.biz/register?ref=KTI9W9J1"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-yellow-500/20 to-amber-500/15 hover:from-yellow-500/30 hover:to-amber-500/25 text-yellow-300 border border-yellow-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Daftar Binance & Klaim Diskon Fee Trading 20%"
+            >
+              <span className="text-yellow-400 font-extrabold text-xs">🟡</span>
+              <span className="hidden md:inline font-extrabold">Trade Binance</span>
+              <span className="px-1 py-0.2 rounded bg-yellow-400/20 text-yellow-300 text-[9px] font-mono border border-yellow-500/30 font-bold hidden sm:inline">-20% Fee</span>
+            </a>
+
             {/* User Account / Cloud Sync Badge */}
             {currentUser ? (
               <button
@@ -7588,6 +7602,31 @@ function TradingGame() {
                     </span>
                   </button>
                 </div>
+
+                {/* Binance Real Trading Pro CTA */}
+                <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-transparent border border-yellow-500/30 text-xs shadow-sm">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="text-base shrink-0">🟡</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-extrabold text-yellow-300 text-[11px] truncate">
+                        {language === 'en' ? 'Ready to Trade Real Crypto?' : 'Siap Cuan di Market Nyata?'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono truncate">
+                        {language === 'en' ? 'Get 20% trading fee discount on Binance' : 'Daftar Binance & klaim diskon fee trading 20% seumur hidup'}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    data-testid="btn-binance-orderform"
+                    href={ADS_CONFIG.affiliate?.binance?.url || "https://www.bmwweb.biz/register?ref=KTI9W9J1"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1.5 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[11px] font-mono shrink-0 transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <span>Trade Real</span>
+                    <ExternalLink className="w-3 h-3 stroke-[2.5]" />
+                  </a>
+                </div>
               </div>
 
               {/* DAFTAR POSISI TERBUKA (MULTI-POSITION TRADING LIST) */}
@@ -8481,6 +8520,19 @@ function TradingGame() {
                 <Play className="w-4 h-4 fill-current" />
                 {t.liqModalBailoutBtn || 'Klaim Dana Talangan 20%'}
               </button>
+
+              {/* Binance Risk Management / Real Trading CTA */}
+              <a
+                data-testid="btn-binance-liquidation"
+                href={ADS_CONFIG.affiliate?.binance?.url || "https://www.bmwweb.biz/register?ref=KTI9W9J1"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-yellow-500/15 to-amber-500/15 hover:from-yellow-500/25 hover:to-amber-500/25 border border-yellow-500/40 text-yellow-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm text-center"
+              >
+                <span>🟡 {language === 'en' ? 'Learn Pro Risk Management on Binance (-20% Fee)' : 'Pelajari Risk Management & Trade di Binance (-20% Fee)'}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+              </a>
+
               <button
                 onClick={() => setLiquidationAlert(null)}
                 className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"

@@ -11,6 +11,14 @@ const adapter = new PrismaPg(pool);
 
 const globalForPrisma = globalThis;
 
+// If cached dev instance is missing newer models (like season), force re-instantiation
+if (globalForPrisma.prisma && !globalForPrisma.prisma.season) {
+  try {
+    globalForPrisma.prisma.$disconnect();
+  } catch {}
+  globalForPrisma.prisma = undefined;
+}
+
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({

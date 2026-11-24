@@ -807,8 +807,35 @@ export default function PnlShareModal({
           </div>
         </div>
 
+        {/* Binance Real Market Conversion Banner */}
+        <div className="px-3 sm:px-4 pt-3 pb-0 bg-[#111622] border-t border-slate-800">
+          <div className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-transparent border border-yellow-500/30 text-xs shadow-sm">
+            <div className="flex items-center gap-2 min-w-0 pr-2">
+              <span className="text-base shrink-0">🟡</span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-extrabold text-yellow-300 text-[11px] truncate">
+                  {lang === 'en' ? 'Tested in Simulation? Time for Real Crypto!' : 'Skill Simulasi Sudah Mantap? Uji di Real Market!'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono truncate">
+                  {lang === 'en' ? 'Get 20% lifetime fee rebate on Binance' : 'Daftar Binance & klaim cashback fee trading 20% seumur hidup'}
+                </span>
+              </div>
+            </div>
+            <a
+              data-testid="btn-binance-pnl-modal"
+              href="https://www.bmwweb.biz/register?ref=KTI9W9J1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1.5 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs font-mono shrink-0 transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+            >
+              <span>{lang === 'en' ? 'Trade Binance' : 'Buka Akun'}</span>
+              <ExternalLink className="w-3 h-3 stroke-[2.5]" />
+            </a>
+          </div>
+        </div>
+
         {/* Action Buttons: Viral Social Shares */}
-        <div className="p-3 sm:p-4 bg-[#111622] border-t border-slate-800 flex flex-col gap-2.5 shrink-0">
+        <div className="p-3 sm:p-4 bg-[#111622] border-t border-slate-800/60 flex flex-col gap-2.5 shrink-0">
           {/* Main Social Channels: Threads & X */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
